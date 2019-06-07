@@ -1,7 +1,7 @@
 # comment
 
 # TODO: need syntax for lists? To pass to the uniform distribution
-  constructor.
+# constructor.
 
 if true:
   x <~ uniform()
