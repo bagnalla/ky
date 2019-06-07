@@ -81,13 +81,3 @@ prefixAlg _ (Fix NeverF) = Hole
 -- prefix function.
 prefix :: Int -> Cotree a -> Tree a
 prefix = hylo prefixAlg natOfIntCoalg
-
-
--- TODO: test this (generating trees from list representation).
-list_coalg :: Coalgebra (TreeF a) [[a]]
-list_coalg ([x]:_) = LeafF x
-list_coalg ([]:l) =
-  let (left, right) = split_lists l in
-    SplitF left right
-list_coalg [] = NeverF -- error?
-list_coalg _ = error ""
