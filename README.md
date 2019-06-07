@@ -1,11 +1,11 @@
 # ky
 
-# app/
+#### app/
 
 * Main.hs - The main entry point. Contains some code for generating
   random trees as well as reading in and parsing programs.
 
-# src/
+#### src/
 
 * Datatypes.hs - Generic setup for open recursion style data types.
 
@@ -47,6 +47,6 @@
 
 * Parser.hs - Megaparsec parser.
 
-# programs/
+#### programs/
 
 * test.ky - example test program
