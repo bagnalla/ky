@@ -1,5 +1,7 @@
 # ky
 
+##### stack build && stack exec ky-exe programs/test1.ky
+
 #### app/
 
 * Main.hs - The main entry point. Contains some code for generating
