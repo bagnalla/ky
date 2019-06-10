@@ -49,6 +49,8 @@
 
 * Parser.hs - Megaparsec parser.
 
+* Tycheck.hs - Typechecking / elaboration from untyped to GADT.
+
 #### programs/
 
 * test.ky - example test program
