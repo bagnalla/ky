@@ -8,10 +8,12 @@ import Text.Megaparsec.Error
 
 import Cotree
 import Datatypes
+import Lang (interp')
 import ListTree
 import Parser (parse)
 import Sexp
 import Tree
+import Tycheck (tycheck)
 import Untyped
 
 -- Fair coin coalgebra.
@@ -155,4 +157,15 @@ main = do
               Left err -> error $ errorBundlePretty err
               Right c -> c
 
+  putStrLn "UNTYPED:"
   putStrLn $ show com
+
+  case tycheck com of
+    Left msg -> putStrLn msg
+    Right tcom -> do
+      putStrLn "TYPED:"
+      putStrLn $ show tcom
+
+      let t = interp' tcom
+      putStrLn "TREE:"
+      putStrLn $ show t

@@ -52,20 +52,26 @@ literal :: Parser Lit
 literal = choice
   [ LBool   <$> bool
   , LFloat  <$> try float
-  , LRational <$> rational ]
+  , LRational <$> try rational
+  , LFloat . fromInteger <$> integer ]
 
-call :: Parser (Exp SourcePos)
-call = do
-  pos <- getSourcePos
+call :: SourcePos -> Parser (Exp SourcePos)
+call pos = do
   f <- EVar pos <$> ident
   args <- parens $ commaSep expr
   return $ ECall pos f args
+
+-- Nil list
+nil :: SourcePos -> Parser (Exp SourcePos)
+nil pos = symbol "nil" >> return (ENil pos)
 
 term :: Parser (Exp SourcePos)
 term = do
   pos <- getSourcePos
   choice
-    [ try call
+    [ nil pos
+    , mkList pos <$> brackets (commaSep expr)
+    , try $ call pos
     , ELit pos <$> literal
     , EVar pos <$> ident
     , parens expr ]
@@ -108,9 +114,10 @@ operatorTable =
     , binary "-" $ flip EBinop BMinus ],
     [ binary "=" $ flip EBinop BEq
     , binary "<" $ flip EBinop BLt ],
-    [ prefix "~" $ flip EUnop UNeg ],
+    [ prefix "~" $ flip EUnop UNot ],
     [ binary "&" $ flip EBinop BAnd
-    , binary "|" $ flip EBinop BOr ] ]
+    , binary "|" $ flip EBinop BOr ],
+    [ binary "::" $ flip EBinop BCons ] ]
 
 expr :: Parser (Exp SourcePos)
 expr = makeExprParser term operatorTable

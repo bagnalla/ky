@@ -1,10 +1,7 @@
 # comment
 
-# TODO: need syntax for lists? To pass to the uniform distribution
-# constructor.
-
 if true:
-  x <~ uniform()
+  x <~ uniform([1, 2, 3])
 else:
   x <~ bernoulli(1/2)
 y <- 1.0

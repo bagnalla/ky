@@ -25,7 +25,8 @@ uniform dom =
     go xs = let m = length xs `div` 2 in Split (go $ take m xs) (go $ drop m xs)
 
 bernoulli :: Rational -> Tree Bool
-bernoulli = undefined -- TODO
+-- bernoulli = undefined -- TODO
+bernoulli _ = Split (Leaf False) (Leaf True) -- temporary
 
 fair_coin :: Tree Bool
 fair_coin = bernoulli $ 1/2
