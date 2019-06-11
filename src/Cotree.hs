@@ -63,13 +63,15 @@ view_coalg f = fold $ f Hole
 canon_coalg :: (Ord a, Show a) => TreeCoalgebra a -> TreeCoalgebra a
 canon_coalg = lift_to_coalg canon
 
-ϕ :: Tree a -> TreeCoalgebra a
-ϕ t1 Hole = unfold t1
-ϕ _ t2 = unfold t2
+phi :: Tree a -> TreeCoalgebra a
+phi t1 Hole = unfold t1
+phi _ t2 = unfold t2
 
-generate :: TreeCoalgebra a -> Cotree a
-generate coalg = ana coalg Hole
+-- generate :: TreeCoalgebra a -> Cotree a
+-- generate coalg = ana coalg Hole
 
+generate :: Tree a -> Cotree a
+generate t = ana (phi t) Hole
 
 prefixAlg :: NatAlgebra (Cotree a -> Tree a)
 prefixAlg O _ = Hole

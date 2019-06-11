@@ -24,6 +24,8 @@
 
 * Sample.hs - State monad sampling of Cotrees.
 
+* Inference.hs - generate histograms and pmfs from samples.
+
 * Sexp.hs - Typeclass for serializing stuff to s-expression format
   (e.g., to visualize trees at
   https://bagnalla.github.io/sexp-trees/).

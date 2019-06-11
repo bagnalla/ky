@@ -24,12 +24,17 @@ sample = cata alg
           if b then s1 else s2
         Nothing -> error "sample: out of bits"
 
-n_samples :: Cotree a -> Int -> Sampler [a]
-n_samples t n = mapM (const $ sample t) [0..n]
-
 run_sampler :: Sampler a -> Bits -> (a, Bits)
 run_sampler = runState
 
 eval_sampler :: Sampler a -> Bits -> a
 eval_sampler = evalState
 
+exec_sampler :: Sampler a -> Bits -> Bits
+exec_sampler = execState
+
+sample_tree :: Cotree a -> Bits -> (a, Bits)
+sample_tree = run_sampler . sample
+
+n_samples :: Cotree a -> Int -> Sampler [a]
+n_samples t n = mapM (const $ sample t) [0..n]
