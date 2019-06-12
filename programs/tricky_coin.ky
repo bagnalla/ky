@@ -1,0 +1,9 @@
+
+main:
+  is_tricky_coin <~ bernoulli(1/2)
+  coin_weight <- 1/2
+  if is_tricky_coin:
+    coin_weight <- 9/10
+  x1 <~ bernoulli(coin_weight)
+  x2 <~ bernoulli(coin_weight)
+
