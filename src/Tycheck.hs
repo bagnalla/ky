@@ -41,6 +41,9 @@ data SomeExp where
   SomeExp :: forall a. (Eq a, Show a, Typeable a) =>
              Type a -> Exp a -> SomeExp
 
+data SomeType where
+  SomeType :: forall a. (Eq a, Show a, Typeable a) => Type a -> SomeType
+
 data Equal a b where
     Equal :: Equal a a
 
@@ -61,7 +64,7 @@ typeEq _ _ = Nothing
 
 
 -- The context maps identifiers to the typed expressions they denote.
-type Context = Symtab SomeExp
+type Context = Symtab SomeType
 
 type TycheckM a = ReaderT Context (ExceptT String Identity) a
 
@@ -86,11 +89,10 @@ tycheckExp (U.ELit _ lit) =
   case val_of_lit lit of
     SomeVal t v -> return $ SomeExp t $ L.EVal v
 
--- NOTE: typechecking never results in a typed variable expression.
 tycheckExp (U.EVar pos x) = do
   ctx <- ask
   case Symtab.get x ctx of
-    Just e -> return e
+    Just (SomeType t) -> return $ SomeExp t $ EVar $ (unId x, Proxy)
     Nothing -> typeError pos $ "unbound variable " ++ show x
 
 tycheckExp (U.EUnop pos U.UNot e) = do
@@ -205,14 +207,14 @@ tycheckCom (U.CSeq pos c1 c2) =
     U.CAssign _ (Id x) e -> do
       SomeExp t e' <- tycheckExp e
       let c1' = Assign (x, Proxy) e'
-      c2' <- local (Symtab.add (Id x) $ SomeExp t e') $ tycheckCom c2
+      c2' <- local (Symtab.add (Id x) $ SomeType t) $ tycheckCom c2
       return $ Seq c1' c2'
     U.CSample _ (Id x) e -> do
       SomeExp t e' <- tycheckExp e
       case t of
         TDist t' -> do
           let c1' = Sample (x, Proxy) e'
-          c2' <- local (Symtab.add (Id x) $ SomeExp t e') $ tycheckCom c2
+          c2' <- local (Symtab.add (Id x) $ SomeType t') $ tycheckCom c2
           return $ Seq c1' c2'
         _ -> typeError pos ""
     _ -> do

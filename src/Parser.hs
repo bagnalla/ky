@@ -181,16 +181,22 @@ com = do
   choice
     [ cSkip pos
     , cAbort pos
-    , try $ cAssign pos
-    , cSample pos
     , cIf pos
-    , cWhile pos ]
+    , cWhile pos
+    , try $ cAssign pos
+    , cSample pos ]
 
 -- func_arg :: Parser (Id, Type)
 -- func_arg = do
 --   x <- ident
 --   t <- (try $ symbol ":" >> ty) <|> (return $ TDynamic)
 --   return (x, t)
+
+main :: Parser (Com SourcePos)
+main = L.indentBlock scn $ do
+  keyword "main"
+  symbol ":"
+  return $ L.IndentSome Nothing (return . mkSeq) com
 
 -- func :: SourcePos -> Parser (Command SourcePos)
 -- func pos = L.indentBlock scn $ do
@@ -255,7 +261,25 @@ com = do
 --       return $ L.IndentNone (Class { class_name = nm
 --                                    , class_commands = coms })
 
+-- prog :: Parser (Com SourcePos)
+-- -- prog = L.nonIndented scn (L.indentBlock scn p)
+-- prog = L.indentBlock scn p
+--   where      
+--     p = do
+--       coms <- some com
+--       eof
+--       return $ L.IndentNone $ mkSeq coms
+
+prog :: Parser (Com SourcePos)
+prog = L.nonIndented scn (L.indentBlock scn p)
+  where      
+    p = do
+      com <- main
+      eof
+      return $ L.IndentNone com
+
+
 parse :: String -> String ->
          Either (ParseErrorBundle String Void) (Com SourcePos)
 parse filename src =
-  runParser com filename src
+  runParser prog filename src

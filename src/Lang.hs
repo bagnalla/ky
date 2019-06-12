@@ -4,9 +4,10 @@
 module Lang where
 
 import Data.Proxy
-import Data.Typeable hiding (typeOf)
+import Data.Typeable
 import Distributions
 import Tree hiding (mu)
+import Util (debug)
 
 mu :: (a -> a) -> a
 mu f = f (mu f)
@@ -54,7 +55,8 @@ get :: Typeable a => Name a -> St -> Maybe (Val a)
 get _ [] = Nothing
 get x (StPkg y v : rest) =
   case cast (y, v) of
-    Just (y', v') -> if x == y' then v' else get x rest
+    Just (y', v') ->
+      if x == y' then Just v' else get x rest
     _ -> get x rest
 
 data UnopTy =
@@ -143,7 +145,11 @@ einterp (EVal v) _ = v
 einterp (EVar x) st =
   case get x st of
     Just v -> v
-    Nothing -> error "einterp: EVar lookup fail"
+    Nothing ->
+      let (x', proxy) = x
+          ty = typeOf proxy in
+        error $ "einterp: unbound variable: " ++ show x
+        ++ " of type " ++ show ty ++ ".\nst: " ++ show st
 einterp (EUnop u e) st =
   case u of
     UNot ->

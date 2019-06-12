@@ -48,8 +48,8 @@ main = do
       putStrLn $ show tcom
 
       let t = interp' tcom
-      putStrLn "TREE:"
-      putStrLn $ show t
+      -- putStrLn "TREE:"
+      -- putStrLn $ show t
 
       -- Generate the cotree.
       let ct = generate t
@@ -57,7 +57,7 @@ main = do
       -- Sample it.
       g <- newStdGen
       let bits = randoms g :: [Bool]
-      let samples = eval_sampler (n_samples ct 1000000) bits
+      let samples = eval_sampler (n_samples ct 10000) bits
 
       -- Plot histogram.
       let hist = generate_histogram samples

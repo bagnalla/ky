@@ -1,0 +1,10 @@
+
+main:
+  T <- 10
+  i <- 0.0
+  ct <- 0.0
+  while i < T:
+    i <- i + 1
+    s <~ bernoulli(1/2)
+    if s:
+      ct <- ct + 1
