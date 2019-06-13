@@ -142,6 +142,12 @@ cSample pos = do
   e <- expr
   return $ CSample pos x e
 
+cObserve :: SourcePos -> Parser (Com SourcePos)
+cObserve pos = do
+  keyword "observe"
+  e <- expr
+  return $ CObserve pos e
+
 cIf :: SourcePos -> Parser (Com SourcePos)
 cIf pos = do
   (e, if') <- L.indentBlock scn p
@@ -181,6 +187,7 @@ com = do
   choice
     [ cSkip pos
     , cAbort pos
+    , cObserve pos
     , cIf pos
     , cWhile pos
     , try $ cAssign pos

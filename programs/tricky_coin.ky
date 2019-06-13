@@ -6,4 +6,4 @@ main:
     coin_weight <- 9/10
   x1 <~ bernoulli(coin_weight)
   x2 <~ bernoulli(coin_weight)
-
+  observe x1 & x2
