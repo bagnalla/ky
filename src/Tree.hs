@@ -205,13 +205,13 @@ swap_subtrees p1 p2 t =
       t2 = get_subtree p2 t in
     update_subtree p1 t2 (update_subtree p2 t1 t)
 
-canon :: (Eq a, Show a) => Tree a -> Tree a
+canon :: Eq a => Tree a -> Tree a
 canon t =
   let t' = reorder $ reduce (group_dupes $ reduce_whole t) in
     if t == t' then
       t'
     else
-      debug (toSexp t ++ " not equal to " ++ toSexp t') $
+      -- debug (toSexp t ++ " not equal to " ++ toSexp t') $
       canon t'
 
 -- Unfold holes once.
