@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, RankNTypes, StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Some inspiration from:
 -- http://augustss.blogspot.com/2009/06/more-llvm-recently-someone-asked-me-on.html
@@ -44,26 +45,22 @@ data SomeExp where
 data SomeType where
   SomeType :: forall a. (Eq a, Show a, Typeable a) => Type a -> SomeType
 
-data Equal a b where
-    Equal :: Equal a a
-
-typeEq :: Type a -> Type b -> Maybe (Equal a b)
-typeEq TBool TBool = Just Equal
-typeEq TFloat TFloat = Just Equal
-typeEq TRational TRational = Just Equal
+typeEq :: Type a -> Type b -> Maybe (a :~: b)
+typeEq TBool TBool = Just Refl
+typeEq TFloat TFloat = Just Refl
+typeEq TRational TRational = Just Refl
 typeEq (TDist s) (TDist t) =
   case typeEq s t of
-    Just Equal -> Just Equal
+    Just Refl -> Just Refl
     Nothing -> Nothing
 typeEq (TList s) (TList t) =
   case typeEq s t of
-    Just Equal -> Just Equal
+    Just Refl -> Just Refl
     Nothing -> Nothing
-typeEq TNil TNil = Just Equal
+typeEq TNil TNil = Just Refl
 typeEq _ _ = Nothing
 
 
--- The context maps identifiers to the typed expressions they denote.
 type Context = Symtab SomeType
 
 type TycheckM a = ReaderT Context (ExceptT String Identity) a
@@ -74,6 +71,7 @@ runTycheck ctx = runIdentity . runExceptT . flip runReaderT ctx
 typeError :: SourcePos -> String -> TycheckM b
 typeError pos msg =
   throwError $ "Type error: " ++ msg ++ " at " ++ show pos
+
 
 val_of_lit :: U.Lit -> SomeVal
 val_of_lit (U.LRational r) = SomeVal TRational $ L.VRational r
@@ -143,14 +141,14 @@ tycheckExp (U.EBinop pos binop e1 e2) = do
              ++ show t1 ++ " and " ++ show t2
     U.BEq ->
       case typeEq t1 t2 of
-        Just Equal ->
+        Just Refl ->
           return $ SomeExp TBool $ L.EBinop L.BEq e1' e2'
         _ -> typeError pos $
              "expected same type on both sides, got "
              ++ show t1 ++ " and " ++ show t2
     U.BLt ->
       case typeEq t1 t2 of
-        Just Equal ->
+        Just Refl ->
           return $ SomeExp TBool $ L.EBinop L.BLt e1' e2'
         _ -> typeError pos $
              "expected same type on both sides, got "
@@ -161,7 +159,7 @@ tycheckExp (U.EBinop pos binop e1 e2) = do
           return $ SomeExp (TList t1) $ L.EList [e1']
         (TList t', EList l) ->
           case typeEq t1 t' of
-            Just Equal ->
+            Just Refl ->
               return $ SomeExp t2 $ L.EList (e1' : l)
             _ -> typeError pos $ "incompatible types: "
                  ++ show t1 ++ " and " ++ show t'
@@ -184,6 +182,18 @@ tycheckExp (U.ECall pos e1 es) = do
 
 tycheckExp (U.ENil _) = return $ SomeExp (TList TNil) $ L.EList []
 
+-- When assigning to a variable, check that the type of the expression
+-- being assigned matches any previous assignments to that variable.
+assert_var_type :: SourcePos -> Id -> Type a -> TycheckM ()
+assert_var_type pos x ty = do
+  ctx <- ask
+  case Symtab.get x ctx of
+    Just (SomeType ty') ->
+      case typeEq ty ty' of
+        Just Refl -> return ()
+        Nothing -> typeError pos ""
+    Nothing -> return ()
+
 
 -- | Typechecking commands.
 
@@ -192,29 +202,34 @@ tycheckCom :: U.Com SourcePos -> TycheckM L.Com
 tycheckCom (U.CSkip _) = return L.Skip
 tycheckCom (U.CAbort _) = return L.Abort
 
-tycheckCom (U.CAssign pos (Id x) e) = do
+tycheckCom (U.CAssign pos x e) = do
   SomeExp t e' <- tycheckExp e
-  return $ Assign (x, Proxy) e'
+  assert_var_type pos x t
+  return $ Assign (unId x, Proxy) e'
 
-tycheckCom (U.CSample pos (Id x) e) = do
+tycheckCom (U.CSample pos x e) = do
   SomeExp t e' <- tycheckExp e
   case t of
-    TDist t' -> return $ Sample (x, Proxy) e'
+    TDist t' -> do
+      assert_var_type pos x t'
+      return $ Sample (unId x, Proxy) e'
     _ -> typeError pos ""
 
 tycheckCom (U.CSeq pos c1 c2) =
   case c1 of
-    U.CAssign _ (Id x) e -> do
+    U.CAssign _ x e -> do
       SomeExp t e' <- tycheckExp e
-      let c1' = Assign (x, Proxy) e'
-      c2' <- local (Symtab.add (Id x) $ SomeType t) $ tycheckCom c2
+      assert_var_type pos x t
+      let c1' = Assign (unId x, Proxy) e'
+      c2' <- local (Symtab.add x $ SomeType t) $ tycheckCom c2
       return $ Seq c1' c2'
-    U.CSample _ (Id x) e -> do
+    U.CSample _ x e -> do
       SomeExp t e' <- tycheckExp e
       case t of
         TDist t' -> do
-          let c1' = Sample (x, Proxy) e'
-          c2' <- local (Symtab.add (Id x) $ SomeType t') $ tycheckCom c2
+          assert_var_type pos x t'
+          let c1' = Sample (unId x, Proxy) e'
+          c2' <- local (Symtab.add x $ SomeType t') $ tycheckCom c2
           return $ Seq c1' c2'
         _ -> typeError pos ""
     _ -> do

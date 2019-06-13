@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs, RankNTypes, StandaloneDeriving #-}
-module Inference (generate_histogram, histogram_pmf, Hist(..), Pmf(..)) where
+module Inference
+  (generate_histogram, histogram_pmf, Hist(..), Pmf(..))
+where
 
 import Data.Bifunctor (bimap)
 import Data.List (sum)
@@ -27,7 +29,7 @@ incr_count v ((SomeVal v', count) : rest) =
       (SomeVal v', count) : incr_count v rest
 
 type Hist = [(String, [(SomeVal, Int)])]
-type Pmf = [(String, [(SomeVal, Float)])]
+type Pmf = [(String, [(SomeVal, Double)])]
 
 upd_hist :: (Show a, Typeable a) => Name a -> Val a -> Hist -> Hist
 upd_hist (x, _) v [] = [(x, [(SomeVal v, 1)])]
@@ -37,6 +39,8 @@ upd_hist (x, proxy) v ((y, counts) : rest) =
   else
     (y, counts) : upd_hist (x, proxy) v rest
 
+-- NOTE: this assumes the state has no duplicate entries (no
+-- shadowing).
 upd_hist_st :: St -> Hist -> Hist
 upd_hist_st [] hist = hist
 upd_hist_st (StPkg x v : st) hist =

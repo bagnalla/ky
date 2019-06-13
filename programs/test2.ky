@@ -1,0 +1,18 @@
+
+# main:
+#   i <- 0.0
+#   ct <- 0.0
+#   while i < 2:
+#     i <- i + 1
+#     s <~ bernoulli(1/2)
+#     if s:
+#       ct <- ct + 1
+
+main:
+  i <- 0.0
+  ct <- 0.0
+  i <- i + 1
+  s <~ bernoulli(1/2)
+  if s:
+    ct <- ct + 1
+  

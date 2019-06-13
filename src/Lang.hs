@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, GADTs, RankNTypes #-}
 {-# LANGUAGE DataKinds, StandaloneDeriving, TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Lang where
 
@@ -47,9 +48,20 @@ type St = [StPkg]
 
 empty :: St
 empty = []
-  
+
+nameEq :: (Typeable a, Typeable b) => Name a -> Name b -> Maybe (a :~: b)
+nameEq _ _ = eqT
+
+-- Replace old entries instead of shadowing.
 upd :: (Show a, Typeable a) => Name a -> Val a -> St -> St
-upd x v st = StPkg x v : st
+upd x v [] = [StPkg x v]
+upd x v (StPkg x' v' : st) =
+  if fst x == fst x' then
+    case nameEq x x' of
+      Just Refl -> StPkg x v : st
+      Nothing -> error ""
+  else
+    StPkg x' v' : upd x v st
 
 get :: Typeable a => Name a -> St -> Maybe (Val a)
 get _ [] = Nothing

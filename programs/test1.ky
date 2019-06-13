@@ -1,7 +1,8 @@
 # comment
 
-if true:
-  x <~ uniform([1, 2, 3])
-else:
-  x <~ bernoulli(1/2)
-y <- 1.0
+main:
+  if true:
+    x <~ uniform([1, 2, 3])
+  else:
+    x <~ bernoulli(1/2)
+  y <- 1.0
