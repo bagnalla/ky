@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TupleSections #-}
+{-# LANGUAGE DeriveFoldable, DeriveFunctor, TupleSections #-}
 
 module Tree where
 
@@ -31,7 +31,7 @@ data Tree a =
   Leaf a
   | Split (Tree a) (Tree a)
   | Hole
-  deriving (Eq, Ord, Functor, Show)
+  deriving (Eq, Ord, Foldable, Functor, Show)
 
 tree_sexp :: Show a => Tree a -> String
 tree_sexp (Leaf x) = "(" ++ show x ++ ")"

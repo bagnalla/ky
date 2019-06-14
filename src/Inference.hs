@@ -1,12 +1,15 @@
 {-# LANGUAGE GADTs, RankNTypes, StandaloneDeriving #-}
 module Inference
-  (generate_histogram, histogram_pmf, Hist(..), Pmf(..))
+  (generate_histogram, histogram_pmf, Hist(..), Pmf(..), var_tree, probOf)
 where
 
 import Data.Bifunctor (bimap)
 import Data.List (sum)
+import Data.Maybe (fromMaybe)
 import Data.Typeable
+
 import Lang
+import Tree
 
 
 -- | Histogram generation from repeated sampling, and probability mass
@@ -59,4 +62,44 @@ histogram_pmf ((x, counts) : rest) =
       rest' = histogram_pmf rest
   in
     (x, normalized) : rest'
-    
+
+
+-- | Exact calculation of probabilities.
+
+subprobability :: Fractional b => (a -> Bool) -> Tree a -> b
+subprobability = go 1
+  where
+    go :: Fractional b => b -> (a -> Bool) -> Tree a -> b
+    go p pred (Leaf x) = if pred x then p else 0
+    go p pred (Split t1 t2) = go (p/2) pred t1 + go (p/2) pred t2
+    go _ _ Hole = 0
+
+total_mass :: Fractional b => Tree a -> b
+total_mass = subprobability $ const True
+
+probability :: Fractional b => (a -> Bool) -> Tree a -> b
+probability pred t = subprobability pred t / total_mass t
+
+probOf :: (Eq a, Fractional b) => a -> Tree a -> b
+probOf x = probability (== x)
+
+support :: Tree a -> [a]
+support = foldMap (:[])
+
+expected_value :: (Eq a, Fractional b) => (a -> b) -> Tree a -> b
+expected_value f t =
+  sum ((\x -> f x * probOf x t) <$> supp) / fromIntegral (length supp)
+  where
+    supp = support t
+
+exact_pmf :: (Eq a, Fractional b) => Tree a -> a -> b
+exact_pmf = flip probOf
+
+
+-- | Specialization to trees of states.
+
+var_tree :: Typeable a => Tree St -> Name a -> Tree (Val a)
+var_tree t x = t >>= \st -> fromMaybe Hole (Leaf <$> get x st)
+
+var_pmf :: (Typeable a, Fractional b) => Tree St -> Name a -> Val a -> b
+var_pmf t x v = probOf v $ var_tree t x

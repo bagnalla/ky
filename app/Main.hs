@@ -3,6 +3,7 @@ module Main where
 import Control.Monad.State
 import Data.Bifunctor (first, second)
 import Data.List (nub, sort, (\\))
+import Data.Proxy
 import System.Environment (getArgs)
 import System.Random
 import Text.Megaparsec.Error
@@ -10,7 +11,7 @@ import Text.Megaparsec.Error
 import Cotree
 import Datatypes
 import Inference
-import Lang (interp')
+import Lang (interp', Val(..))
 import ListTree
 import Parser (parse)
 import Sample (eval_sampler, n_samples)
@@ -48,8 +49,24 @@ main = do
       putStrLn $ show tcom
 
       let t = interp' tcom
-      -- putStrLn "TREE:"
-      -- putStrLn $ show t
+      putStrLn "TREE:"
+      putStrLn $ toSexp t
+      
+      -- For testing bernoulli stuff.
+      -- let xt = var_tree t ("x", Proxy :: Proxy Bool)
+      -- putStrLn $ toSexp xt
+      -- putStrLn "exact Pr(true):"
+      -- putStrLn $ show $ probOf (VBool True) xt
+      -- putStrLn "exact Pr(false):"
+      -- putStrLn $ show $ probOf (VBool False) xt
+      
+      -- For testing tricky coin example.
+      -- let xt = var_tree t ("is_tricky_coin", Proxy :: Proxy Bool)
+      -- putStrLn $ toSexp $ canon xt
+      -- putStrLn "exact Pr(true):"
+      -- putStrLn $ show $ probOf (VBool True) xt
+      -- putStrLn "exact Pr(false):"
+      -- putStrLn $ show $ probOf (VBool False) xt
 
       -- Generate the cotree.
       let ct = generate t
