@@ -43,9 +43,8 @@
 * Distributions.hs - Primitive distribution constructions. Uniform,
   Bernoulli, etc.
 
-* Untyped.hs - Untyped abstract syntax for parsing convenience, to be
-  typechecked and elaborated into the GADT representation after
-  parsing from a file.
+* Untyped.hs - Untyped abstract syntax to be typechecked and
+  elaborated to the GADT representation after parsing from a file.
 
 * Token.hs - Some things used by the parser.
 
@@ -55,4 +54,12 @@
 
 #### programs/
 
-* test.ky - example test program
+* test.ky - Example test program.
+
+* bernoulli.ky - For testing the built-in Bernoulli distribution.
+
+* fair_coin.ky - Simulating a fair coin using an unfair one.
+
+* flips.ky - Stochastic domination example from Hsu's thesis.
+
+* tricky_coin.ky - Tricky coin inference example.
