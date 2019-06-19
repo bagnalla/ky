@@ -1,10 +1,11 @@
 module Util where
 
+import Control.Monad
 import Data.Bifunctor
 import Debug.Trace (trace)
 
--- debug = const id
-debug = trace
+debug = const id
+-- debug = trace
 
 allEq :: Eq a => [a] -> Bool
 allEq [] = True
@@ -54,3 +55,8 @@ headMaybe (x:_) = Just x
 
 bimap' :: (a -> b) -> (a, a) -> (b, b)
 bimap' f = bimap f f
+
+-- We use this with f = Tree, m = InterpM, a = St.
+mapJoin :: (Traversable f, Monad f, Monad m) =>
+                f a -> (a -> m (f a)) -> m (f a)
+mapJoin x g = join <$> (mapM g x)

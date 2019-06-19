@@ -11,7 +11,7 @@ import Text.Megaparsec.Error
 import Cotree
 import Datatypes
 import Inference
-import Lang (interp', Val(..))
+import Lang (runInterp', Val(..))
 import ListTree
 import Parser (parse)
 import Sample (eval_sampler, n_samples)
@@ -48,7 +48,7 @@ main = do
       putStrLn "TYPED:"
       putStrLn $ show tcom
 
-      let t = interp' tcom
+      let t = runInterp' tcom
       putStrLn "TREE:"
       putStrLn $ toSexp t
       
@@ -60,15 +60,23 @@ main = do
       -- putStrLn "exact Pr(false):"
       -- putStrLn $ show $ probOf (VBool False) xt
       
-      -- For testing tricky coin example.
-      -- let xt = var_tree t ("is_tricky_coin", Proxy :: Proxy Bool)
-      -- putStrLn $ toSexp $ canon xt
+      -- -- For testing tricky coin example.
+      -- let xt = canon $ var_tree t ("is_tricky_coin", Proxy :: Proxy Bool)
+      -- -- putStrLn $ toSexp $ canon xt
+      -- putStrLn $ toSexp $ xt
       -- putStrLn "exact Pr(true):"
       -- putStrLn $ show $ probOf (VBool True) xt
       -- putStrLn "exact Pr(false):"
       -- putStrLn $ show $ probOf (VBool False) xt
 
-      -- Generate the cotree.
+      -- let xt = canon $ var_tree t ("x", Proxy :: Proxy Bool)
+      -- putStrLn $ toSexp $ xt
+      -- putStrLn "exact Pr(true):"
+      -- putStrLn $ show $ probOf (VBool True) xt
+      -- putStrLn "exact Pr(false):"
+      -- putStrLn $ show $ probOf (VBool False) xt
+
+      -- -- Generate the cotree.
       let ct = generate t
 
       -- Sample it.

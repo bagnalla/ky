@@ -1,14 +1,18 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, GADTs, RankNTypes #-}
 {-# LANGUAGE DataKinds, StandaloneDeriving, TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TupleSections, TypeOperators #-}
 
 module Lang where
 
+import Control.Monad.State hiding (get)
+import qualified Control.Monad.State as S (get)
+
+import Data.Bifunctor (first)
 import Data.Proxy
 import Data.Typeable
 import Distributions
 import Tree hiding (mu)
-import Util (debug)
+import Util (debug, mapJoin)
 
 mu :: (a -> a) -> a
 mu f = f (mu f)
@@ -21,6 +25,7 @@ data Val a where
   VBool :: Bool -> Val Bool
   VTree :: Tree (Exp a) -> Val (Tree a)
   VList :: [Val a] -> Val [a]
+  VPair :: Val a -> Val b -> Val (a, b)
 
 -- Mark this as incoherent so GHC prefers the other instance when
 -- possible.
@@ -29,8 +34,9 @@ instance Eq (Val a) where
   VRational x == VRational y = x == y
   VFloat x == VFloat y = x == y
   VBool x == VBool y = x == y
-  VList _ == VList _ = error "no equality on lists for now"
   VTree _ == VTree _ = error "no equality on trees for now"
+  VList _ == VList _ = error "no equality on lists for now"
+  VPair _ _ == VPair _ _ = error "no equality on pairs for now"
 
 -- instance {-# OVERLAPPING #-} Eq a => Eq (Val [a]) where
 --   VList l1 == VList l2 = l1 == l2
@@ -42,8 +48,9 @@ instance Show a => Show (Val a) where
   show (VRational v) = "VRational " ++ show v
   show (VFloat v) = "VFloat " ++ show v
   show (VBool b) = "VBool " ++ show b
-  show (VList _) = "VList"
   show (VTree _) = "VTree"
+  show (VList _) = "VList"
+  show (VPair _ _) = "VPair"
 
 -- instance {-# OVERLAPPING #-} Show a => Show (Val (Tree a)) where
 --   show (VTree d) = "(VTree " ++ show d ++ ")"
@@ -58,22 +65,22 @@ instance Eq StPkg where
       Nothing -> False
 
 instance Show StPkg where
-  show (StPkg (x, _) v) = "(" ++ show x ++ ", " ++ show v ++ ")"
+  show (StPkg (x, _) v) = "{" ++ show x ++ ", " ++ show v ++ "}"
 
 type St = [StPkg]
 
 empty :: St
 empty = []
 
-nameEq :: (Typeable a, Typeable b) => Name a -> Name b -> Maybe (a :~: b)
-nameEq _ _ = eqT
+nameEqT :: (Typeable a, Typeable b) => Name a -> Name b -> Maybe (a :~: b)
+nameEqT _ _ = eqT
 
 -- Replace old entries instead of shadowing.
 upd :: (Show a, Typeable a) => Name a -> Val a -> St -> St
 upd x v [] = [StPkg x v]
 upd x v (StPkg x' v' : st) =
   if fst x == fst x' then
-    case nameEq x x' of
+    case nameEqT x x' of
       Just Refl -> StPkg x v : st
       Nothing -> error ""
   else
@@ -106,6 +113,7 @@ data BinopTy =
   | BTOr
   | BTEq
   | BTLt
+  | BTPair
 
 data Binop a where
   BPlus :: Binop BTPlus
@@ -115,20 +123,22 @@ data Binop a where
   BOr :: Binop BTOr
   BEq :: Binop BTEq
   BLt :: Binop BTLt
+  BPair :: Binop BTPair
 deriving instance Eq (Binop a)
 deriving instance Show (Binop a)
 
-type family BinopResTy (a :: BinopTy) (b :: *) where
-  BinopResTy BTPlus Double = Double
-  BinopResTy BTPlus Rational = Rational
-  BinopResTy BTMinus Double = Double
-  BinopResTy BTMinus Rational = Rational
-  BinopResTy BTMult Double = Double
-  BinopResTy BTMult Rational = Rational
-  BinopResTy BTAnd Bool = Bool
-  BinopResTy BTOr Bool = Bool
-  BinopResTy BTEq t = Bool
-  BinopResTy BTLt t = Bool
+type family BinopResTy (a :: BinopTy) (b :: *) (c :: *) where
+  BinopResTy BTPlus Double Double = Double
+  BinopResTy BTPlus Rational Rational = Rational
+  BinopResTy BTMinus Double Double = Double
+  BinopResTy BTMinus Rational Rational = Rational
+  BinopResTy BTMult Double Double = Double
+  BinopResTy BTMult Rational Rational = Rational
+  BinopResTy BTAnd Bool Bool = Bool
+  BinopResTy BTOr Bool Bool = Bool
+  BinopResTy BTEq t t = Bool
+  BinopResTy BTLt t t = Bool
+  BinopResTy BTPair s t = (s, t)
 
 data Exp a where
   EVal :: Val a -> Exp a
@@ -136,7 +146,7 @@ data Exp a where
   EUnop :: (Typeable a, Show b, Typeable b) =>
            Unop a -> Exp b -> Exp (UnopResTy a b)
   EBinop :: (Typeable a, Show b, Typeable b) =>
-            Binop a -> Exp b -> Exp b -> Exp (BinopResTy a b)
+            Binop a -> Exp b -> Exp b -> Exp (BinopResTy a b b)
   EList :: (Show a, Typeable a) => [Exp a] -> Exp [a]
   EUniform :: (Show a, Typeable a) => Exp [a] -> Exp (Tree a)
   EBernoulli :: Exp Rational -> Exp (Tree Bool)
@@ -167,70 +177,6 @@ instance Show a => Show (Exp a) where
   show (EList l) = "(EList " ++ show l ++ ")"
   show (EUniform e) = "(EUniform " ++ show e ++ ")"
   show (EBernoulli e) = "(EBernoulli " ++ show e ++ ")"
-
-einterp :: Typeable a => Exp a -> St -> Val a
-einterp (EVal v) _ = v
-einterp (EVar x) st =
-  case get x st of
-    Just v -> v
-    Nothing ->
-      let (x', proxy) = x
-          ty = typeOf proxy in
-        error $ "einterp: unbound variable: " ++ show x
-        ++ " of type " ++ show ty ++ ".\nst: " ++ show st
-einterp (EUnop u e) st =
-  case u of
-    UNot ->
-      case einterp e st of
-        VBool b -> VBool $ not b
-        _ -> error "einterp: ill-typed UNot expression"
-einterp (EBinop b e1 e2) st =
-  case b of
-    BPlus ->
-      case (einterp e1 st, einterp e2 st) of
-        (VRational r1, VRational r2) -> VRational $ r1 + r2
-        (VFloat f1, VFloat f2) -> VFloat $ f1 + f2
-        _ -> error "einterp: ill-typed BPlus expression"
-    BMinus ->
-      case (einterp e1 st, einterp e2 st) of
-        (VRational r1, VRational r2) -> VRational $ r1 - r2
-        (VFloat f1, VFloat f2) -> VFloat $ f1 - f2
-        _ -> error "einterp: ill-typed BMinus expression"
-    BMult ->
-      case (einterp e1 st, einterp e2 st) of
-        (VRational r1, VRational r2) -> VRational $ r1 * r2
-        (VFloat f1, VFloat f2) -> VFloat $ f1 * f2
-        _ -> error "einterp: ill-typed BMult expression"
-    BAnd ->
-      case (einterp e1 st, einterp e2 st) of
-        (VBool b1, VBool b2) -> VBool $ b1 && b2
-        _ -> error "einterp: ill-typed BAnd expression"
-    BOr ->
-      case (einterp e1 st, einterp e2 st) of
-        (VBool b1, VBool b2) -> VBool $ b1 || b2
-        _ -> error "einterp: ill-typed BOr expression"
-    BEq ->
-      case (einterp e1 st, einterp e2 st) of
-        (VRational r1, VRational r2) -> VBool $ r1 == r2
-        (VFloat f1, VFloat f2) -> VBool $ f1 == f2
-        (VBool b1, VBool b2) -> VBool $ b1 == b2
-        _ -> error "einterp: ill-typed BEq expression"
-    BLt ->
-      case (einterp e1 st, einterp e2 st) of
-        (VRational r1, VRational r2) -> VBool $ r1 < r2
-        (VFloat f1, VFloat f2) -> VBool $ f1 < f2
-        (VBool b1, VBool b2) -> VBool $ b1 < b2
-        _ -> error "einterp: ill-typed BLt expression"
-einterp (EList l) st = VList $ flip einterp st <$> l  
-einterp (EUniform e) st =
-  let VList vals = einterp e st in
-    VTree $ uniform $ EVal <$> vals
-einterp (EBernoulli p) st =
-  let VRational p' = einterp p st in
-    VTree $ EVal . VBool <$> bernoulli p'
-
-is_true :: Exp Bool -> St -> Bool
-is_true e st = let VBool b = einterp e st in b
 
 
 type Pattern = forall a. Tree a -> Tree a -> Tree a
@@ -281,38 +227,157 @@ instance Show Com where
   show (Observe b) = "(Observe " ++ show b ++ ")"
   show (While b c) = "(While " ++ show b ++ ", " ++ show c ++ ")"
 
-
 -- | Interpreting commands as tree transformers.
 
-interp :: Com -> Tree St -> Tree St
-interp Skip t = t
-interp Abort t = bind t (\_ -> Hole)
-interp (Combine p c1 c2) t =
-  t >>= \st -> p (interp c1 (Leaf st)) (interp c2 (Leaf st))
-interp (Assign x e) t =
-  t >>= \st -> Leaf $ upd x (einterp e st) st
-interp (Seq c1 c2) t = interp c2 (interp c1 t)
-interp (Ite e c1 c2) t =
-  t >>= \st -> if is_true e st then interp c1 (Leaf st)
-               else interp c2 (Leaf st)
-interp (Sample x e) t =
-  t >>= \st -> case einterp e st of
-                 VTree t' -> fmap (\e' -> upd x (einterp e' st) st) t'
+-- Gensym counter
+type InterpState = Int
 
--- Derived commands:
-interp (Flip c1 c2) t = interp (Combine Split c1 c2) t
-interp (Observe e) t = interp (Ite e Skip Abort) t
+type InterpM = State InterpState
+
+freshLbl :: InterpM Int
+freshLbl = do
+  counter <- S.get
+  put $ counter + 1
+  return $ counter + 1
+
+is_true :: Exp Bool -> St -> InterpM Bool
+is_true e st = do
+  b <- einterp e st
+  case b of
+    VBool b' -> return b'
+
+
+einterp :: Typeable a => Exp a -> St -> InterpM (Val a)
+einterp (EVal v) _ = return v
+einterp (EVar x) st =
+  case get x st of
+    Just v -> return v
+    Nothing ->
+      let (x', proxy) = x
+          ty = typeOf proxy in
+        error $ "einterp: unbound variable: " ++ show x
+        ++ " of type " ++ show ty ++ ".\nst: " ++ show st
+einterp (EUnop u e) st = do
+  v <- einterp e st
+  case u of
+    UNot ->
+      case v of
+        VBool b -> return $ VBool $ not b
+        _ -> error "einterp: ill-typed UNot expression"
+einterp (EBinop b e1 e2) st = do
+  v1 <- einterp e1 st
+  v2 <- einterp e2 st
+  case b of
+    BPlus ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VRational $ r1 + r2
+        (VFloat f1, VFloat f2) -> return $ VFloat $ f1 + f2
+        _ -> error "einterp: ill-typed BPlus expression"
+    BMinus ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VRational $ r1 - r2
+        (VFloat f1, VFloat f2) -> return $ VFloat $ f1 - f2
+        _ -> error "einterp: ill-typed BMinus expression"
+    BMult ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VRational $ r1 * r2
+        (VFloat f1, VFloat f2) -> return $ VFloat $ f1 * f2
+        _ -> error "einterp: ill-typed BMult expression"
+    BAnd ->
+      case (v1, v2) of
+        (VBool b1, VBool b2) -> return $ VBool $ b1 && b2
+        _ -> error "einterp: ill-typed BAnd expression"
+    BOr ->
+      case (v1, v2) of
+        (VBool b1, VBool b2) -> return $ VBool $ b1 || b2
+        _ -> error "einterp: ill-typed BOr expression"
+    BEq ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VBool $ r1 == r2
+        (VFloat f1, VFloat f2) -> return $ VBool $ f1 == f2
+        (VBool b1, VBool b2) -> return $ VBool $ b1 == b2
+        _ -> error "einterp: ill-typed BEq expression"
+    BLt ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VBool $ r1 < r2
+        (VFloat f1, VFloat f2) -> return $ VBool $ f1 < f2
+        (VBool b1, VBool b2) -> return $ VBool $ b1 < b2
+        _ -> error "einterp: ill-typed BLt expression"
+    BPair ->
+      return $ VPair v1 v2
+einterp (EList es) st = do
+  vs <- mapM (flip einterp st) es
+  return $ VList vs
+einterp (EUniform e) st = do
+  lbl <- freshLbl
+  debug ("euniform lbl: " ++ show lbl) $ do
+    v <- einterp e st
+    case v of
+      VList vals -> return $ VTree $ uniform lbl $ EVal <$> vals
+einterp (EBernoulli p) st = do
+  lbl <- freshLbl
+  debug ("ebernoulli lbl: " ++ show lbl) $ do
+    v <- einterp p st
+    case v of
+      VRational p' -> return $ VTree $ EVal . VBool <$> bernoulli lbl p'
+
+
+interp :: Com -> Tree (Int, St) -> InterpM (Tree (Int, St))
+interp Skip t = return t
+interp (Assign x e) t = do
+  mapJoin t $ \(lbl, st) -> do
+    v <- einterp e st
+    return $ Leaf $ (lbl, upd x v st)
+interp (Sample x e) t = do
+  mapJoin t $ \(lbl, st) -> do
+    v <- einterp e st
+    case v of
+      -- VTree t' -> set_label fresh_lbl <$>
+      VTree t' ->
+        mapM (\e' -> do
+                 v' <- einterp e' st
+                 return (lbl, upd x v' st)) t'
+
+interp (Seq c1 c2) t = interp c1 t >>= interp c2
+
+interp (Ite e c1 c2) t = do
+  mapJoin t $ \(_, st) -> do
+    fresh_lbl <- freshLbl
+    debug ("ite fresh_lbl: " ++ show fresh_lbl) $ do
+      b <- is_true e st
+      -- t1 <- interp c1 $ Leaf (fresh_lbl, st)
+      -- t2 <- interp c2 $ Leaf (fresh_lbl, st)
+      -- debug ("t1: " ++ show t1) $
+      --   debug ("t2: " ++ show t2) $
+        -- if b then return t1 else return t2
+      set_label fresh_lbl <$>
+        if b then
+          interp c1 $ Leaf (fresh_lbl, st)
+        else
+          interp c2 $ Leaf (fresh_lbl, st)
+
 interp (While e c) t =
-  mu (\f t ->
-        t >>= \st -> if is_true e st then f (interp c (Leaf st))
-                     else Leaf st) t
+  mfix $ \t -> do
+  mapJoin t $ \(_, st) -> do
+    fresh_lbl <- freshLbl
+    debug ("while fresh_lbl: " ++ show fresh_lbl) $ do
+      b <- is_true e st
+      set_label fresh_lbl <$>
+        if b then
+          interp c $ Leaf (fresh_lbl, st)
+        else
+          return $ Leaf (fresh_lbl, st)
 
+interp (Observe e) t = do
+  mapJoin t $ \(lbl, st) -> do
+    b <- is_true e st
+    if b then return $ Leaf (lbl, st) else return $ Hole 0
 
--- We can interpret a command as just a tree by applying its
--- interpretation to the empty state (Leaf empty). Then we can take
--- the cotree generated by the tree.
+interp Abort t = interp (Observe $ EVal $ VBool False) t
 
--- TODO: can we canonicalize here? If not, where/when?
-interp' :: Com -> Tree St
-interp' c = interp c (Leaf empty)
--- interp' c = canon $ interp c (Leaf empty)
+runInterp :: Com -> Tree St -> Tree St
+runInterp c t = fmap snd $ evalState (interp c $ fmap ((-1,)) t) (-1)
+
+runInterp' :: Com -> Tree St
+runInterp' c = set_label 0 $ runInterp c (Leaf empty)
+-- runInterp' c = set_label 0 $ runInterp c (Leaf empty)

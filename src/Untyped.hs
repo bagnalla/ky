@@ -11,6 +11,7 @@ data Binop =
   | BEq
   | BLt
   | BCons
+  | BPair
   deriving Show
 
 data Unop =
@@ -21,6 +22,7 @@ data Lit =
   LRational Rational
   | LFloat Double
   | LBool Bool
+  | LPair Lit Lit
   deriving Show
 
 data Exp a =

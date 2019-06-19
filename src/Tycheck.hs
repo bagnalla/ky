@@ -16,7 +16,7 @@ import           Lang as L
 import qualified Untyped as U
 import           Symtab (Id(..), Symtab)
 import qualified Symtab (add, empty, get)
-import Tree (Tree)
+import           Tree (Tree)
 
 data Type a where
   TBool :: Type Bool
@@ -181,6 +181,7 @@ tycheckExp (U.ECall pos e1 es) = do
     _ -> typeError pos ""
 
 tycheckExp (U.ENil _) = return $ SomeExp (TList TNil) $ L.EList []
+
 
 -- When assigning to a variable, check that the type of the expression
 -- being assigned matches any previous assignments to that variable.

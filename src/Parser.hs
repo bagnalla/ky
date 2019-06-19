@@ -61,16 +61,29 @@ call pos = do
   args <- parens $ commaSep expr
   return $ ECall pos f args
 
+list :: SourcePos -> Parser (Exp SourcePos)
+list pos = mkList pos <$> brackets (commaSep expr)
+
 -- Nil list
 nil :: SourcePos -> Parser (Exp SourcePos)
 nil pos = symbol "nil" >> return (ENil pos)
+
+pair :: SourcePos -> Parser (Exp SourcePos)
+pair pos = do
+  symbol "("
+  e1 <- expr
+  symbol ","
+  e2 <- expr
+  symbol ")"
+  return $ EBinop pos BPair e1 e2
 
 term :: Parser (Exp SourcePos)
 term = do
   pos <- getSourcePos
   choice
     [ nil pos
-    , mkList pos <$> brackets (commaSep expr)
+    , list pos
+    , try $ pair pos
     , try $ call pos
     , ELit pos <$> literal
     , EVar pos <$> ident
