@@ -7,7 +7,7 @@ import Util
 
 -- Tree that generates the uniform distribution cotree over a given
 -- list (assumed to not contain duplicates).
-uniform :: Eq a => Int -> [a] -> Tree a
+uniform :: (Eq a, Show a) => Int -> [a] -> Tree a
 uniform lbl dom =
   set_label lbl $ canon $ go $
   -- canon $ go $

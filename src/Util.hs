@@ -4,8 +4,8 @@ import Control.Monad
 import Data.Bifunctor
 import Debug.Trace (trace)
 
-debug = const id
--- debug = trace
+-- debug = const id
+debug = trace
 
 allEq :: Eq a => [a] -> Bool
 allEq [] = True

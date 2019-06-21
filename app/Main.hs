@@ -51,6 +51,10 @@ main = do
       let t = runInterp' tcom
       putStrLn "TREE:"
       putStrLn $ toSexp t
+
+      let t' = canon t
+      putStrLn "REDUCED TREE:"
+      putStrLn $ toSexp t'
       
       -- For testing bernoulli stuff.
       -- let xt = var_tree t ("x", Proxy :: Proxy Bool)
@@ -78,18 +82,29 @@ main = do
 
       -- -- Generate the cotree.
       let ct = generate t
+      let ct' = generate t'
 
       -- Sample it.
       g <- newStdGen
       let bits = randoms g :: [Bool]
       let samples = eval_sampler (n_samples ct 10000) bits
 
+      let samples' = eval_sampler (n_samples ct' 10000) bits
+
       -- Plot histogram.
       let hist = generate_histogram samples
       putStrLn "HISTOGRAM:"
       putStrLn $ show hist
 
+      let hist' = generate_histogram samples'
+      putStrLn "REDUCED HISTOGRAM:"
+      putStrLn $ show hist'
+
       -- Compute probability mass function.
       let pmf = histogram_pmf hist
       putStrLn "PMF:"
       putStrLn $ show pmf
+
+      let pmf' = histogram_pmf hist'
+      putStrLn "REDUCED PMF:"
+      putStrLn $ show pmf'

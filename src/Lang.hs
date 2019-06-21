@@ -61,8 +61,16 @@ data StPkg where
 instance Eq StPkg where
   StPkg (x1, _) v1 == StPkg (x2, _) v2 =
     case cast v1 of
-      Just v2 -> x1 == x2 && v1 == v2
+      Just v1' ->
+        -- debug ("x1: " ++ show x1) $
+        -- debug ("x2: " ++ show x2) $
+        -- debug ("v1: " ++ show v1) $
+        -- debug ("v2: " ++ show v2) $
+        x1 == x2 && v1' == v2
       Nothing -> False
+
+-- instance Eq StPkg where
+--   _ == _ = False
 
 instance Show StPkg where
   show (StPkg (x, _) v) = "{" ++ show x ++ ", " ++ show v ++ "}"
@@ -183,16 +191,16 @@ type Pattern = forall a. Tree a -> Tree a -> Tree a
 
 data Com where 
   Skip :: Com
-  Abort :: Com
   Combine :: Pattern -> Com -> Com -> Com  
   Assign :: (Eq a, Show a, Typeable a) => Name a -> Exp a -> Com
   Seq :: Com -> Com -> Com
   Ite :: Exp Bool -> Com -> Com -> Com
   Sample :: (Eq a, Show a, Typeable a) => Name a -> Exp (Tree a) -> Com
-  -- Derived commands:
-  Flip :: Com -> Com -> Com  
-  Observe :: Exp Bool -> Com
   While :: Exp Bool -> Com -> Com
+  Observe :: Exp Bool -> Com
+  -- Derived commands:
+  Abort :: Com
+  Flip :: Com -> Com -> Com
 
 instance Eq Com where
   Skip == Skip = True
@@ -310,16 +318,14 @@ einterp (EList es) st = do
   return $ VList vs
 einterp (EUniform e) st = do
   lbl <- freshLbl
-  debug ("euniform lbl: " ++ show lbl) $ do
-    v <- einterp e st
-    case v of
-      VList vals -> return $ VTree $ uniform lbl $ EVal <$> vals
+  v <- einterp e st
+  case v of
+    VList vals -> return $ VTree $ uniform lbl $ EVal <$> vals
 einterp (EBernoulli p) st = do
   lbl <- freshLbl
-  debug ("ebernoulli lbl: " ++ show lbl) $ do
-    v <- einterp p st
-    case v of
-      VRational p' -> return $ VTree $ EVal . VBool <$> bernoulli lbl p'
+  v <- einterp p st
+  case v of
+    VRational p' -> return $ VTree $ EVal . VBool <$> bernoulli lbl p'
 
 
 interp :: Com -> Tree (Int, St) -> InterpM (Tree (Int, St))
@@ -332,7 +338,6 @@ interp (Sample x e) t = do
   mapJoin t $ \(lbl, st) -> do
     v <- einterp e st
     case v of
-      -- VTree t' -> set_label fresh_lbl <$>
       VTree t' ->
         mapM (\e' -> do
                  v' <- einterp e' st
@@ -343,30 +348,23 @@ interp (Seq c1 c2) t = interp c1 t >>= interp c2
 interp (Ite e c1 c2) t = do
   mapJoin t $ \(_, st) -> do
     fresh_lbl <- freshLbl
-    debug ("ite fresh_lbl: " ++ show fresh_lbl) $ do
-      b <- is_true e st
-      -- t1 <- interp c1 $ Leaf (fresh_lbl, st)
-      -- t2 <- interp c2 $ Leaf (fresh_lbl, st)
-      -- debug ("t1: " ++ show t1) $
-      --   debug ("t2: " ++ show t2) $
-        -- if b then return t1 else return t2
-      set_label fresh_lbl <$>
-        if b then
-          interp c1 $ Leaf (fresh_lbl, st)
-        else
-          interp c2 $ Leaf (fresh_lbl, st)
+    b <- is_true e st
+    set_label fresh_lbl <$>
+      if b then
+        interp c1 $ Leaf (fresh_lbl, st)
+      else
+        interp c2 $ Leaf (fresh_lbl, st)
 
 interp (While e c) t =
   mfix $ \t -> do
   mapJoin t $ \(_, st) -> do
     fresh_lbl <- freshLbl
-    debug ("while fresh_lbl: " ++ show fresh_lbl) $ do
-      b <- is_true e st
-      set_label fresh_lbl <$>
-        if b then
-          interp c $ Leaf (fresh_lbl, st)
-        else
-          return $ Leaf (fresh_lbl, st)
+    b <- is_true e st
+    set_label fresh_lbl <$>
+      if b then
+        interp c $ Leaf (fresh_lbl, st)
+      else
+        return $ Leaf (fresh_lbl, st)
 
 interp (Observe e) t = do
   mapJoin t $ \(lbl, st) -> do
@@ -380,4 +378,3 @@ runInterp c t = fmap snd $ evalState (interp c $ fmap ((-1,)) t) (-1)
 
 runInterp' :: Com -> Tree St
 runInterp' c = set_label 0 $ runInterp c (Leaf empty)
--- runInterp' c = set_label 0 $ runInterp c (Leaf empty)

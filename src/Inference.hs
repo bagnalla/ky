@@ -66,6 +66,9 @@ histogram_pmf ((x, counts) : rest) =
 
 -- | Exact calculation of probabilities.
 
+-- | NOTE: this probably doesn't work anymore now that trees can have
+-- labelled holes.
+
 -- subprobability :: Fractional b => (a -> Bool) -> Tree a -> b
 -- subprobability = go 1
 --   where

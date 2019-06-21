@@ -85,7 +85,7 @@ label_of :: Tree a -> Int
 label_of (Split (Just lbl) _ _) = lbl
 label_of _ = error "label_of: no label"
 
--- -- Coupling trees. May not work when the two trees have holes in
+-- -- Coupled product. May not work when the two trees have holes in
 -- -- different locations.
 -- coupling :: Tree a -> Tree b -> Tree (a, b)
 -- coupling t1 (Leaf y) = fmap (,y) t1
@@ -134,26 +134,66 @@ leaves (Leaf x) = [x]
 leaves (Hole _) = []
 leaves (Split _ t1 t2) = leaves t1 ++ leaves t2
 
+holes :: Tree a -> [Int]
+holes (Leaf _) = []
+holes (Hole n) = [n]
+holes (Split _ t1 t2) = holes t1 ++ holes t2
+
 terminals :: Tree a -> [Tree a]
 terminals (Split _ t1 t2) = terminals t1 ++ terminals t2
 terminals t = [t]
 
-reduce_whole :: Eq a => Tree a -> Tree a
-reduce_whole t =
-  case leaves t of
-    [] -> Hole 0
-    (x:xs) | allEq (x:xs) -> Leaf x
-    _ -> t
+-- This attempts to find entire subtrees which contain only a single
+-- leaf value (perhaps multiple occurrences) and whose holes all point
+-- back to the root of the subtree. Any such subtrees are replaced by
+-- a single leaf.
+reduce_whole :: (Eq a, Show a) => Tree a -> Tree a
+reduce_whole (Split Nothing t1 t2) =
+  Split Nothing (reduce_whole t1) (reduce_whole t2)
+reduce_whole (Split (Just lbl) t1 t2) =
+  let t1' = reduce_whole t1
+      t2' = reduce_whole t2
+      ls = leaves t1' ++ leaves t2'
+      hs = holes t1' ++ holes t2'
+  in
+    case ls of
+      [] -> Hole 0
+      (x:xs) | allEq ls && all (== lbl) hs -> Leaf x
+      _ -> Split (Just lbl) t1' t2'
+reduce_whole t = t
 
-reduce :: Eq a => Tree a -> Tree a
-reduce (Split n t1 t2) =
-  let t1' = reduce t1
-      t2' = reduce t2 in
+is_terminal :: Tree a -> Bool
+is_terminal (Split _ _ _) = False
+is_terminal _ = True
+
+-- Produce the reduced tree as well as a list of patches* to be
+-- applied afterward. *When a labelled split node is replaced by a
+-- terminal node, we have to go through the tree and replace all holes
+-- with that label by the terminal node.
+-- By reduce here we just mean collapsing split nodes with duplicate
+-- children.
+reduce :: Eq a => Tree a -> (Tree a, [(Int, Tree a)])
+reduce (Split lbl t1 t2) =
+  let (t1', ps1) = reduce t1
+      (t2', ps2) = reduce t2
+      ps = ps1 ++ ps2 in
     case (terminals t1' ++ terminals t2') of
       [] -> error "reduce: no terminals (INFINITE TREE?)"
-      (x:xs) | allEq (x:xs) -> x
-      _ -> Split n t1' t2'
-reduce t = t
+      (x:xs) | allEq (x:xs) ->
+               (x, (case (lbl, is_terminal x) of
+                      (Just lbl', True) -> [(lbl', x)]
+                      _ -> []) ++ ps)
+      _ -> (Split lbl t1' t2', ps)
+reduce t = (t, [])
+
+-- Apply patches to a tree.
+apply_patches :: [(Int, Tree a)] -> Tree a -> Tree a
+apply_patches ps (Hole lbl) = case lookup lbl ps of
+                             Just t -> t
+                             Nothing -> Hole lbl
+apply_patches ps (Split lbl t1 t2) =
+  Split lbl (apply_patches ps t1) (apply_patches ps t2)
+apply_patches _ t = t
 
 -- Sort leaves at each level and always keep leaves and holes to the
 -- left of split siblings.
@@ -222,14 +262,20 @@ swap_subtrees p1 p2 t =
       t2 = get_subtree p2 t in
     update_subtree p1 t2 (update_subtree p2 t1 t)
 
-canon :: Eq a => Tree a -> Tree a
+canon :: (Eq a, Show a) => Tree a -> Tree a
 canon t =
-  let t' = reorder $ reduce (group_dupes $ reduce_whole t) in
-    if t == t' then
-      t'
-    else
-      -- debug (toSexp t ++ " not equal to " ++ toSexp t') $
-      canon t'
+  let t1 = reduce_whole t
+      t2 = group_dupes t1
+      (t3, patches) = reduce t2
+      t4 = apply_patches patches t3
+      t5 = reorder t4 in
+    -- debug ("t: " ++ toSexp t) $
+    -- debug ("t1: " ++ toSexp t1) $
+    -- debug ("t2: " ++ toSexp t2) $
+    -- debug ("t3: " ++ toSexp t3) $
+    -- debug ("t4: " ++ toSexp t4) $
+    -- debug ("t5: " ++ toSexp t5) $
+    if t5 == t then t5 else canon t5
 
 -- Unfold holes once.
 expand :: Tree a -> Tree a
