@@ -196,11 +196,11 @@ data Com where
   Seq :: Com -> Com -> Com
   Ite :: Exp Bool -> Com -> Com -> Com
   Sample :: (Eq a, Show a, Typeable a) => Name a -> Exp (Tree a) -> Com
-  While :: Exp Bool -> Com -> Com
   Observe :: Exp Bool -> Com
   -- Derived commands:
   Abort :: Com
   Flip :: Com -> Com -> Com
+  While :: Exp Bool -> Com -> Com
 
 instance Eq Com where
   Skip == Skip = True
@@ -355,16 +355,18 @@ interp (Ite e c1 c2) t = do
       else
         interp c2 $ Leaf (fresh_lbl, st)
 
-interp (While e c) t =
-  mfix $ \t -> do
-  mapJoin t $ \(_, st) -> do
-    fresh_lbl <- freshLbl
-    b <- is_true e st
-    set_label fresh_lbl <$>
-      if b then
-        interp c $ Leaf (fresh_lbl, st)
-      else
-        return $ Leaf (fresh_lbl, st)
+-- interp (While e c) t =
+--   mfix $ \t -> do
+--   mapJoin t $ \(_, st) -> do
+--     fresh_lbl <- freshLbl
+--     b <- is_true e st
+--     set_label fresh_lbl <$>
+--       if b then
+--         interp c $ Leaf (fresh_lbl, st)
+--       else
+--         return $ Leaf (fresh_lbl, st)
+
+interp (While e c) t = interp (Ite e (Seq c (While e c)) Skip) t
 
 interp (Observe e) t = do
   mapJoin t $ \(lbl, st) -> do

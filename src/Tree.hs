@@ -147,20 +147,26 @@ terminals t = [t]
 -- leaf value (perhaps multiple occurrences) and whose holes all point
 -- back to the root of the subtree. Any such subtrees are replaced by
 -- a single leaf.
-reduce_whole :: (Eq a, Show a) => Tree a -> Tree a
+reduce_whole :: (Eq a, Show a) => Tree a -> (Tree a, [(Int, Tree a)])
 reduce_whole (Split Nothing t1 t2) =
-  Split Nothing (reduce_whole t1) (reduce_whole t2)
+  let (t1', ps1) = reduce_whole t1
+      (t2', ps2) = reduce_whole t2 in
+    (Split Nothing t1' t2', ps1 ++ ps2)
 reduce_whole (Split (Just lbl) t1 t2) =
-  let t1' = reduce_whole t1
-      t2' = reduce_whole t2
+  let (t1', ps1) = reduce_whole t1
+      (t2', ps2) = reduce_whole t2
+      ps = ps1 ++ ps2
       ls = leaves t1' ++ leaves t2'
       hs = holes t1' ++ holes t2'
   in
-    case ls of
-      [] -> Hole 0
-      (x:xs) | allEq ls && all (== lbl) hs -> Leaf x
-      _ -> Split (Just lbl) t1' t2'
-reduce_whole t = t
+    if all (== lbl) hs then
+      case ls of
+        [] -> error "reduce_hole: no leaves or outgoing holes"
+        (x:xs) | allEq ls -> (Leaf x, (lbl, Leaf x) : ps)
+        _ -> (Split (Just lbl) t1' t2', ps)
+    else
+      (Split (Just lbl) t1' t2', ps)
+reduce_whole t = (t, [])
 
 is_terminal :: Tree a -> Bool
 is_terminal (Split _ _ _) = False
@@ -180,9 +186,15 @@ reduce (Split lbl t1 t2) =
     case (terminals t1' ++ terminals t2') of
       [] -> error "reduce: no terminals (INFINITE TREE?)"
       (x:xs) | allEq (x:xs) ->
-               (x, (case (lbl, is_terminal x) of
-                      (Just lbl', True) -> [(lbl', x)]
-                      _ -> []) ++ ps)
+               case lbl of
+                 Just lbl' ->
+                   case x of
+                     Split x_lbl x_t1 x_t2 ->
+                       case x_lbl of
+                         Just x_lbl' -> (x, (lbl', Hole x_lbl') : ps)
+                         Nothing -> (Split (Just lbl') x_t1 x_t2, ps)
+                     _ -> (x, (lbl', x) : ps)
+                 Nothing -> (x, ps)
       _ -> (Split lbl t1' t2', ps)
 reduce t = (t, [])
 
@@ -234,6 +246,7 @@ at_depth _ _ = []
 -- together, but will do at least one grouping if possible. We can
 -- iteratively apply this function together with reduce to
 -- canonicalize a tree.
+-- TODO: fix for labelled trees.
 group_dupes :: Eq a => Tree a -> Tree a
 group_dupes t = foldl f t [0 .. depth t]
   where
@@ -264,18 +277,23 @@ swap_subtrees p1 p2 t =
 
 canon :: (Eq a, Show a) => Tree a -> Tree a
 canon t =
-  let t1 = reduce_whole t
-      t2 = group_dupes t1
-      (t3, patches) = reduce t2
-      t4 = apply_patches patches t3
-      t5 = reorder t4 in
-    -- debug ("t: " ++ toSexp t) $
-    -- debug ("t1: " ++ toSexp t1) $
+  let
+    (t1, ps) = reduce_whole t
+    t2 = apply_patches ps t1
+    -- t3 = group_dupes t
+    (t4, ps') = reduce t2
+    t5 = apply_patches ps' t4
+    t6 = reorder t5
+    -- t6 = t5
+  in
+    -- debug ("\nt: " ++ toSexp t) $
+    -- debug ("\nt1: " ++ toSexp t1) $
     -- debug ("t2: " ++ toSexp t2) $
     -- debug ("t3: " ++ toSexp t3) $
     -- debug ("t4: " ++ toSexp t4) $
     -- debug ("t5: " ++ toSexp t5) $
-    if t5 == t then t5 else canon t5
+    -- debug ("t6: " ++ toSexp t6) $
+    if t6 == t then t6 else canon t6
 
 -- Unfold holes once.
 expand :: Tree a -> Tree a
@@ -444,3 +462,7 @@ labelled_subtrees _ = []
 --     go lbl (Hole lbl') = Hole $ if lbl' == -1 then lbl else lbl'
 --     go lbl (Split lbl' t1 t2) = Split lbl' (go lbl t1) (go lbl t2)
 -- fix_holes t = t
+
+tree_size :: Tree a -> Int
+tree_size (Split _ t1 t2) = 1 + tree_size t1 + tree_size t2
+tree_size _ = 1

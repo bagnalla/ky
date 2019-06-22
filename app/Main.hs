@@ -49,12 +49,14 @@ main = do
       putStrLn $ show tcom
 
       let t = runInterp' tcom
-      putStrLn "TREE:"
-      putStrLn $ toSexp t
+      -- putStrLn "TREE:"
+      -- putStrLn $ toSexp t
+      putStrLn $ "size: " ++ (show $ tree_size t)
 
       let t' = canon t
-      putStrLn "REDUCED TREE:"
-      putStrLn $ toSexp t'
+      -- putStrLn "REDUCED TREE:"
+      -- putStrLn $ toSexp t'
+      putStrLn $ "size: " ++ (show $ tree_size t')
       
       -- For testing bernoulli stuff.
       -- let xt = var_tree t ("x", Proxy :: Proxy Bool)
