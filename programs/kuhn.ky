@@ -1,0 +1,55 @@
+# 0=J, 1=Q, 2=K
+main:
+  p1 <- 0
+  p2 <- 2
+
+  # p1 is uniform from [J,Q,K]
+  # TODO: probably want syntax from sampling uniforms
+  c11 <~ bernoulli(1/3)
+  c12 <~ bernoulli(1/2)
+  if c11:
+    p1 <- 0
+  else:
+    if c12:
+      p1 <- 1
+    else:
+      p1 <- 2
+
+  # p2 is uniform from [J,Q,K] - {p1}, which we express
+  # with the observe statement below
+  c21 <~ bernoulli(1/3)
+  c22 <~ bernoulli(1/2)
+  if c21:
+    p2 <- 0
+  else:
+    if c22:
+      p2 <- 1
+    else:
+      p2 <- 2
+
+  # p1 and p2 can't choose the same card
+  observe(~(p1 = p2))
+
+  # initial parameters
+  p1_1 <- 1/2
+  p2_1 <- 1/2
+  p1_2 <- 1/2
+
+  p1_check <~ bernoulli(p1_1)
+  observe(p1_check)
+  if p1_check:
+    p2_check <~ bernoulli(p2_1)
+    if p2_check:
+      p1_payoff <- 1
+      p2_payoff <- 0 - 1
+    else: # p2 bets
+      p1_call <~ bernoulli(p1_2)
+      if p1_call:
+        p1_payoff <- 2
+	p2_payoff <- 0 - 2
+      else: # p1 folds
+        p1_payoff <- 0 - 1
+	p2_payoff <- 1
+  # p1 bets
+  # ... not implemented ...
+    
