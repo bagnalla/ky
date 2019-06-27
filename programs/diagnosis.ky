@@ -1,0 +1,9 @@
+# Another Bayesian inference example
+# (cf. https://www.math.hmc.edu/funfacts/ffiles/30002.6.shtml)
+main:
+  false_pos <~ bernoulli(1/100)
+  has_disease <~ bernoulli(1/10000)
+  test_pos <- false_pos | has_disease
+  observe(test_pos)
+
+  
