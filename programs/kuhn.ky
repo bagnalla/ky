@@ -31,19 +31,19 @@ main:
   observe(~(p1 = p2))
 
   # initial parameters
-  p1_1 <- 1/2
-  p2_1 <- 1/2
-  p1_2 <- 1/2
+  p1_check <~ bernoulli(1/2)
+  p2_check <~ bernoulli(1/2)
+  p1_call <~ bernoulli(1/2)
 
-  p1_check <~ bernoulli(p1_1)
+  p1_payoff <- 0
+  p2_payoff <- 0
+
   observe(p1_check)
   if p1_check:
-    p2_check <~ bernoulli(p2_1)
     if p2_check:
       p1_payoff <- 1
       p2_payoff <- 0 - 1
     else: # p2 bets
-      p1_call <~ bernoulli(p1_2)
       if p1_call:
         p1_payoff <- 2
 	p2_payoff <- 0 - 2
@@ -52,4 +52,5 @@ main:
 	p2_payoff <- 1
   # p1 bets
   # ... not implemented ...
-    
+
+  observe(p1_payoff < p2_payoff)
