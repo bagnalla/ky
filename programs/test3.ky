@@ -1,0 +1,13 @@
+
+main:
+  d <~ bernoulli(2/3)
+  r <- 0
+  if d:
+    b <~ bernoulli(1/2)
+    if b:
+      r <- 0
+    else:
+      r <- 1
+  else:
+    r <- 2
+  observe ~ (r = 0)
