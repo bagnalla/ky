@@ -1,0 +1,11 @@
+main:
+  r <- 0
+  c1 <~ bernoulli(2/3)
+  if c1:
+    c2 <~ bernoulli(2/3)
+    if c2:
+      r <- 1
+    else:
+      r <- 2
+  else:
+    r <- 3

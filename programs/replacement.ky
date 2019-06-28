@@ -1,0 +1,9 @@
+main:
+  J <- 0
+  Q <- 1
+  K <- 2
+  x <~ uniform([J, Q, K])
+  y <~ uniform([J, Q, K])
+  observe(~(y = x))
+  z <~ uniform([J, Q, K])
+  observe(~(z = x) & ~(z = y))
