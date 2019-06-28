@@ -1,0 +1,6 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 20)
+
+main:
+    s <- false
+    k <~ bernoulli(1/2)
+    r <- (k & ~s) | (~k & s)

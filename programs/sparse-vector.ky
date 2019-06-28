@@ -1,0 +1,33 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 65)
+
+# problems:
+#   - representation of dataset Q = [q1..qn]
+#   - representation of q1..qn as queries
+#       * assume evalQ(i, d) = qi(d)
+#   - returning list size
+
+main:
+    T <- 0
+    N <- 10
+    C <- 10
+
+    i <- 1
+    out <- []
+    t <~ laplacian(T)
+    while (i <= N) & (size(out) < C):
+        ans <- (0, 0)
+        go <- True
+
+        while (i <= N) & go:
+            a <~ laplacian(evalQ(i, d))
+            if a > t:
+                noisy <~ laplacian(evalQ(i, d))
+                ans <- (i, noisy)
+                out <- ans :: out
+                go <- False
+            # end if
+
+            i <- i + 1
+        # end while
+    # end while
+# end main

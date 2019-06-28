@@ -1,0 +1,32 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 98)
+
+# see sparse-vector.ky for implementation issues
+
+main:
+    A <- 0
+    B <- 1
+    N <- 10
+    C <- 10
+
+    i <- 1
+    out <- []
+    while (i <= N) & (size(out) < C):
+        u <~ laplacian(0)
+        a <- A - u
+        b <- B + u
+        go <- True
+        ans <- (0, 0)
+
+        while (i <= N) & go:
+            v <~ laplacian(evalQ(i, d))
+            if (a < v) & (v < b):
+                noisy <~ laplacian(evalQ(i, d))
+                ans <- (i, noisy)
+                out <- ans :: out
+                go <- False
+            # end if
+
+            i <- i + 1
+        # end while
+    # end while
+# end main

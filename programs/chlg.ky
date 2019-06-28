@@ -1,0 +1,67 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 41)
+
+main:
+    T <- 10
+    # set up graph & system
+    P <- [0, 1, 2, 3, 4]
+    V <- [0, 1, 2, 3, 4, 5, 6, 7]
+    E <- [(0, 1), (1, 2), (1, 3), (2, 4), (3, 4), (4, 5), (4, 6), (5, 7), (6, 7)]
+    # map of (p, v): -1 for no assigned vertex
+    w <- [(0, -1), (1, -1), (2, -1), (3, -1), (4, -1)]
+
+    #      2   5                           p1   p3
+    #     / \ / \      possible           /  \ /  \
+    # 0--1   4   7  -> arrangement:  p0--O    O    O
+    #     \ / \ /                         \  / \  /
+    #      3   6                           p2   p4
+
+    i <- 0
+    while i < T:
+        # assume safe, prove otherwise if not
+        safe <- True
+        p <~ uniform(P)
+        v <~ uniform(V)
+
+        # enum edges for position conflicts (assume |E| = 9)
+        j <- 0
+        while j < 9:
+            # dodgy way of pattern checking for matching v
+            if E[j][0] = v:
+                # assumes |w| = |P| = 5
+                k <- 0
+                while k < 5:
+                    # check for conflicts
+                    if w[k][1] = E[j][1]:
+                        safe <- False
+
+                    k <- k + 1
+                # end while
+            else:
+                if E[j][1] = v:
+                    k <- 0
+                    while k < 5:
+                        if w[k][0] = E[j][0]:
+                            safe <- False
+
+                        k <- k + 1
+                    # end while
+                # end if
+            # end if-else
+
+            j <- j + 1
+        # end while
+
+        if safe:
+            j <- 0
+            while j < 5:
+                # change mapped v for p
+                if w[j][0] = p:
+                    w[j][1] <- v
+
+                j <- j + 1
+            # end while
+        # end if
+
+        i <- i + 1
+    # end while
+# end main

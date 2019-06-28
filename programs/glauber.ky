@@ -1,0 +1,67 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 38)
+
+# assumes indexing for pairs as if 2-dim array
+#   i.e. E[0] = (0, 2) -> E[0][0] = 0, E[0][1] = 2
+#   adjust accordingly after pairs are implemented
+
+main:
+    T <- 10
+    # set up graph G
+    V <- [0, 1, 2, 3, 4]
+    E <- [(0, 2), (1, 2), (2, 3), (2, 4)]
+    C <- [0, 1, 2, 3]
+    # coloring map: -1 for no assigned color
+    w <- [(0, -1), (1, -1), (2, -1), (3, -1)]
+
+    i <- 0
+    while i < T:
+        # assume false for validity func.
+        valid <- False
+        v <~ uniform(V)
+        c <~ uniform(C)
+
+        # enum edges for color conflicts (assume |E| = 4)
+        j <- 0
+        while j < 4:
+            # dodgy way of pattern checking for matching v
+            if E[j][0] = v:
+                # assumes |w| = |V| = 4
+                k <- 0
+                while k < 4:
+                    # if color does not conflict, then valid
+                    if w[k][0] = E[j][1]:
+                        if w[k][1] != c:
+                            valid <- true
+
+                    k <- k + 1
+                # end while
+            else:
+                if E[j][1] = v:
+                    k <- 0
+                    while k < 4:
+                        if w[k][0] = E[j][0]:
+                            if w[k][1] != c:
+                                valid <- true
+
+                        k <- k + 1
+                    # end while
+                # end if
+            # end if-else
+
+            j <- j + 1
+        # end while
+
+        if valid:
+            j <- 0
+            while j < 4:
+                # change mapped color for v
+                if w[j][0] = v:
+                    w[j][1] <- c
+
+                j <- j + 1
+            # end while
+        # end if
+
+        i <- i + 1
+    # end while
+# end main

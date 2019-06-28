@@ -1,0 +1,16 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 22)
+# only tracks net position, not history
+
+main:
+    start <- 0
+    T <- 10
+
+    pos <- start
+    i <- 0
+    while i < T:
+        i <- i + 1
+        r <~ bernoulli(1/2)
+        if r:
+            pos <- pos + 1
+        else:
+            pos <- pos - 1

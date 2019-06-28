@@ -1,0 +1,11 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 34)
+# only tracks net position, not history
+
+main:
+    start <~ uniform([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    T <- 20
+
+    pos <- start
+    while pos < T:
+        r <~ uniform([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        pos <- pos + r

@@ -1,0 +1,21 @@
+# https://arxiv.org/pdf/1710.09951.pdf (pg. 62)
+
+# problems:
+#   - representing dataset Q = [q1..qn] where q : D -> Z
+#   - representing q1..qn as query functions
+
+main:
+    N <- 10
+    maxA <- 0
+    maxI <- 0
+    while i <= N:
+        # assume evalQ(i, d) returns qi(d)
+        a <~ laplacian(evalQ(i, d))
+        if (maxI = 0) | (a > maxA):
+            maxA <- a
+            maxI <- i
+        # end if
+
+        i <- i + 1
+    # end while
+# end main
