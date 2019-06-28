@@ -1,7 +1,7 @@
 main:
   x <- 0 #jack
-  y <- 1 #queen
-  z <- 2 #king
+  y <- 1 #not jack
+  z <- 1 #not jack 
   x_i <- 0
   y_i <- 1
   z_i <- 2
