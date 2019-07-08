@@ -58,5 +58,8 @@ bimap' f = bimap f f
 
 -- We use this with f = Tree, m = InterpM, a = St.
 mapJoin :: (Traversable f, Monad f, Monad m) =>
-                f a -> (a -> m (f a)) -> m (f a)
+                f a -> (a -> m (f b)) -> m (f b)
 mapJoin x g = join <$> (mapM g x)
+
+isSubsetOf :: Eq a => [a] -> [a] -> Bool
+isSubsetOf xs ys = all (`elem` ys) xs

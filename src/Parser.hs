@@ -1,15 +1,12 @@
 module Parser where
 
--- TODO: Syntax for patterns.. a small calculus for manipulating
--- distributions?
-
--- Also, multiple commands in a file? Formal parameters?
-
 import Control.Monad (void)
 
 import Control.Monad.Combinators.Expr -- from parser-combinators
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (fromMaybe)
 import Data.Ratio
+import Data.Set (singleton)
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -48,12 +45,13 @@ rational = do
   denom <- integer
   return $ num % denom
 
-literal :: Parser Lit
+literal :: Parser Literal
 literal = choice
-  [ LBool   <$> bool
-  , LFloat  <$> try float
+  [ LBool <$> bool
+  , LFloat <$> try float
   , LRational <$> try rational
-  , LFloat . fromInteger <$> integer ]
+  -- , LFloat . fromInteger <$> integer ]
+  , LInteger . fromInteger <$> integer ]
 
 call :: SourcePos -> Parser (Exp SourcePos)
 call pos = do
@@ -61,12 +59,29 @@ call pos = do
   args <- parens $ commaSep expr
   return $ ECall pos f args
 
-list :: SourcePos -> Parser (Exp SourcePos)
-list pos = mkList pos <$> brackets (commaSep expr)
+cond :: SourcePos -> Parser (Exp SourcePos)
+cond pos = do
+  symbol "if"
+  b <- expr
+  symbol "then"
+  e1 <- expr
+  symbol "else"
+  e2 <- expr
+  return $ ECond pos b e1 e2
 
--- Nil list
+list :: SourcePos -> Parser (Exp SourcePos)
+list pos = do
+  l <- brackets (commaSep expr)
+  symbol ":"
+  t <- ty
+  return $ mkList pos t l
+
 nil :: SourcePos -> Parser (Exp SourcePos)
-nil pos = symbol "nil" >> return (ENil pos)
+nil pos = do
+  symbol "nil"
+  symbol ":"
+  t <- ty
+  return $ ENil pos t
 
 pair :: SourcePos -> Parser (Exp SourcePos)
 pair pos = do
@@ -77,14 +92,48 @@ pair pos = do
   symbol ")"
   return $ EBinop pos BPair e1 e2
 
+-- destruct :: SourcePos -> Parser (Exp SourcePos)
+-- destruct pos = do
+--   symbol "destruct"
+--   l <- expr
+--   z <- expr
+--   f <- expr
+--   symbol "end"
+--   return $ EDestruct pos l z f
+
+destruct :: SourcePos -> Parser (Exp SourcePos)
+destruct pos = do
+  symbol "destruct"
+  symbol "("
+  l <- expr
+  symbol ","
+  z <- expr
+  symbol ","
+  f <- expr
+  symbol ")"
+  return $ EDestruct pos l z f
+
+lam :: SourcePos -> Parser (Exp SourcePos)
+lam pos = do
+  symbol "\\"
+  x <- ident
+  symbol ":"
+  t <- ty
+  symbol "."
+  e <- expr
+  return $ ELam pos x t e
+
 term :: Parser (Exp SourcePos)
 term = do
   pos <- getSourcePos
   choice
     [ nil pos
     , list pos
+    , destruct pos
     , try $ pair pos
     , try $ call pos
+    , try $ cond pos
+    , lam pos
     , ELit pos <$> literal
     , EVar pos <$> ident
     , parens expr ]
@@ -120,13 +169,26 @@ postfix name f = Postfix $ do
   s <- getSourcePos
   return $ f s
 
+-- -- Helper for single-character operators that overlap with others. For
+-- -- example, we must use this for the regular addition operator '+' or
+-- -- else '+=' won't work.
+-- op' :: Binop -> String -> [Char] -> Operator Parser (Exp SourcePos)
+-- op' b s cs = InfixL $ getSourcePos >>= \pos -> EBinop pos b <$ op s cs
+
+op n ms =
+  (lexeme . try) (string n <* notFollowedBy (choice (char <$> ms)))
+
 operatorTable :: [[Operator Parser (Exp SourcePos)]]
 operatorTable =
   [ [ binary "*" $ flip EBinop BMult ],
     [ binary "+" $ flip EBinop BPlus
     , binary "-" $ flip EBinop BMinus ],
     [ binary "=" $ flip EBinop BEq
-    , binary "<" $ flip EBinop BLt ],
+    , InfixN $ getSourcePos >>= \s -> EBinop s BLt <$ op "<" ['=']
+    , InfixN $ getSourcePos >>= \s -> EBinop s BGt <$ op ">" ['=']
+    , binary "<=" $ flip EBinop BLe
+    , binary ">=" $ flip EBinop BGe
+    , binary "<>" $ flip EBinop BNe ],
     [ prefix "~" $ flip EUnop UNot ],
     [ binary "&" $ flip EBinop BAnd
     , binary "|" $ flip EBinop BOr ],
@@ -206,11 +268,77 @@ com = do
     , try $ cAssign pos
     , cSample pos ]
 
--- func_arg :: Parser (Id, Type)
--- func_arg = do
---   x <- ident
---   t <- (try $ symbol ":" >> ty) <|> (return $ TDynamic)
---   return (x, t)
+pair_ty :: Parser Type
+pair_ty = do
+  symbol "("
+  s <- ty
+  symbol ","
+  t <- ty
+  symbol ")"
+  return $ TPair s t
+
+list_ty :: Parser Type
+list_ty = do
+  symbol "["
+  t <- ty
+  symbol "]"
+  return $ TList t
+
+arrow_ty :: Parser Type
+arrow_ty = do
+  s <- ty
+  symbol "->"
+  t <- ty
+  return $ TArrow s t
+
+ty :: Parser Type
+ty = choice
+  [ keyword "rational" >> return TRational
+  , keyword "float" >> return TFloat
+  , keyword "bool" >> return TBool
+  , keyword "int" >> return TInteger
+  , pair_ty
+  , list_ty
+  , arrow_ty ]
+
+func_arg :: Parser (Id, Type)
+func_arg = do
+  x <- ident
+  symbol ":"
+  t <- ty
+  return (x, t)
+
+func :: Parser (Function SourcePos)
+func = L.indentBlock scn $ do
+  keyword "func"
+  f_nm <- ident
+  args <- parens $ commaSep func_arg
+  f_ty <- symbol "->" >> ty
+  symbol ":"
+  return $ L.IndentSome Nothing
+    (\es -> case es of
+        [e] -> return $ Function { function_name = f_nm
+                                 , function_type = f_ty
+                                 , function_args = args
+                                 , function_body = e }
+        _ -> failure Nothing $ singleton $
+             Label $ NonEmpty.fromList "unexpected expression")
+    expr
+
+dist :: Parser (Dist SourcePos)
+dist = L.indentBlock scn $ do
+  keyword "dist"
+  dist_nm <- ident
+  args <- parens $ commaSep func_arg
+  dist_ty <- symbol "->" >> ty
+  symbol ":"
+  return $ L.IndentSome Nothing
+    (\coms ->
+       return $ Dist { dist_name = dist_nm
+                     , dist_type = dist_ty
+                     , dist_args = args
+                     , dist_body = mkSeq coms })
+    com
 
 main :: Parser (Com SourcePos)
 main = L.indentBlock scn $ do
@@ -218,88 +346,19 @@ main = L.indentBlock scn $ do
   symbol ":"
   return $ L.IndentSome Nothing (return . mkSeq) com
 
--- func :: SourcePos -> Parser (Command SourcePos)
--- func pos = L.indentBlock scn $ do
---   static <- (keyword "static" >> return True) <|> return False
---   keyword "func"
---   f <- ident
---   args <- parens $ commaSep func_arg
---   f_ty <- (symbol "->" >> ty) <|> return TDynamic
---   symbol ":"
---   return $ L.IndentSome Nothing
---     (return . (CFunc pos static f f_ty args)) stmt
-
--- signal :: SourcePos -> Parser (Command SourcePos)
--- signal pos = L.indentBlock scn $ do
---   keyword "signal"
---   nm <- ident
---   args <- optional $ parens $ commaSep ident
---   return $ L.IndentNone $ CSignal pos nm $ fromMaybe [] args
-
--- extends :: SourcePos -> Parser (Command SourcePos)
--- extends pos = L.indentBlock scn $ do
---   -- c <- keyword "extends" >> expr >>= return . CExtends pos
---   c <- keyword "extends" >> ty >>= return . CExtends pos
---   return $ L.IndentNone c
-
--- classname :: SourcePos -> Parser (Command SourcePos)
--- classname pos = L.indentBlock scn $ do
---   keyword "class_name"
---   nm <- ident
---   path <- optional $ symbol "," >> stringLiteral
---   return $ L.IndentNone $ CClassName pos nm path
-
--- command :: Parser (Command SourcePos)
--- command = do
---   pos <- getSourcePos
---   choice
---     [ enum pos
---     , cvar pos
---     , cconst pos
---     , func pos
---     , extends pos
---     , nestedCls pos
---     , signal pos
---     , classname pos ]
-
--- nestedCls :: SourcePos -> Parser (Command SourcePos)
--- nestedCls pos = L.indentBlock scn $ do
---   keyword "class"
---   nm <- ident
---   symbol ":"
---   return $ L.IndentSome Nothing
---     (\coms -> return $ CClass pos $
---               Class { class_name = nm
---                     , class_commands = coms }) command
-
--- cls :: Id -> Parser (Class SourcePos)
--- cls nm = L.nonIndented scn (L.indentBlock scn p)
---   where      
---     p = do
---       coms <- some command
---       eof
---       return $ L.IndentNone (Class { class_name = nm
---                                    , class_commands = coms })
-
--- prog :: Parser (Com SourcePos)
--- -- prog = L.nonIndented scn (L.indentBlock scn p)
--- prog = L.indentBlock scn p
---   where      
---     p = do
---       coms <- some com
---       eof
---       return $ L.IndentNone $ mkSeq coms
-
-prog :: Parser (Com SourcePos)
+prog :: Parser ([Either (Function SourcePos) (Dist SourcePos)], Com SourcePos)
 prog = L.nonIndented scn (L.indentBlock scn p)
   where      
     p = do
+      funcs_dists <- many $ choice [Left <$> func, Right <$> dist]
       com <- main
       eof
-      return $ L.IndentNone com
+      return $ L.IndentNone (funcs_dists, com)
 
 
+-- Main parsing function called from the outside.
 parse :: String -> String ->
-         Either (ParseErrorBundle String Void) (Com SourcePos)
+         Either (ParseErrorBundle String Void)
+         ([Either (Function SourcePos) (Dist SourcePos)], Com SourcePos)
 parse filename src =
   runParser prog filename src

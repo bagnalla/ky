@@ -241,6 +241,26 @@ at_depth (Split _ t1 t2) n
     map (second (True:)) (at_depth t2 (n-1))
 at_depth _ _ = []
 
+path_labels :: Path -> Tree a -> [Int]
+path_labels (b:bs) (Split lbl t1 t2) =
+  (case lbl of
+     Just lbl' -> [lbl']
+     Nothing -> []) ++ path_labels bs (if b then t1 else t2)
+path_labels _ _ = []
+
+compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
+compatible_for_swap t p1 p2 =
+  let t1 = get_subtree p1 t
+      t2 = get_subtree p2 t
+      t1_labels = path_labels p1 t
+      t2_labels = path_labels p2 t
+      t1_holes = holes t1
+      t2_holes = holes t2 in
+    t1 == t2 &&
+    isSubsetOf t1_holes t2_labels &&
+    isSubsetOf t2_holes t1_labels
+    -- && False
+
 -- If there are two duplicate leaves at the same level, group them
 -- together as siblings. Doesn't necessarily group all such duplicates
 -- together, but will do at least one grouping if possible. We can
@@ -259,12 +279,16 @@ group_dupes t = foldl f t [0 .. depth t]
             Nothing -> t
     dupes :: Eq a => [(Tree a, Path)] -> [(Tree a, Path)] -> Maybe (Path, Path)
     dupes _ [] = Nothing
-    dupes seen ((t, p):rest) = case lookup t seen of
-      Just p' -> Just (p', p)
-      Nothing -> dupes ((t, p) : seen) rest
+    dupes seen ((t', p):rest) = case lookup t' seen of
+      Just p' ->
+        if compatible_for_swap t p p' then
+          Just (p', p)
+        else
+          dupes ((t', p) : seen) rest
+      Nothing -> dupes ((t', p) : seen) rest
 
 sibling_path :: Path -> Path
-sibling_path [] = error "sibling_path: no sibling"
+sibling_path [] = error "sibling_path: empty list"
 sibling_path [False] = [True]
 sibling_path [True] = [False]
 sibling_path (b:bs) = b : sibling_path bs
@@ -280,7 +304,7 @@ canon t =
   let
     (t1, ps) = reduce_whole t
     t2 = apply_patches ps t1
-    -- t3 = group_dupes t
+    -- t3 = group_dupes t -- TODO: fix
     (t4, ps') = reduce t2
     t5 = apply_patches ps' t4
     t6 = reorder t5

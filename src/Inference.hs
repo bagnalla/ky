@@ -15,9 +15,9 @@ import Tree
 -- | Histogram generation from repeated sampling, and probability mass
 -- functions from normalized histograms.
 
-data SomeVal where
-  SomeVal :: forall a. (Show a, Typeable a) => Val a -> SomeVal
-deriving instance Show SomeVal
+-- data SomeVal where
+--   SomeVal :: forall a. (Show a, Typeable a) => Val a -> SomeVal
+-- deriving instance Show SomeVal
 
 incr_count :: (Show a, Typeable a) => Val a ->
               [(SomeVal, Int)] -> [(SomeVal, Int)]
@@ -46,7 +46,7 @@ upd_hist (x, proxy) v ((y, counts) : rest) =
 -- shadowing).
 upd_hist_st :: St -> Hist -> Hist
 upd_hist_st [] hist = hist
-upd_hist_st (StPkg x v : st) hist =
+upd_hist_st (SomeNameVal x v : st) hist =
   upd_hist_st st $ upd_hist x v hist
 
 generate_histogram :: [St] -> Hist

@@ -1,7 +1,9 @@
 module Distributions where
 
 import Data.Ratio
+import Data.Typeable
 
+-- import Lang
 import Tree
 import Util
 
@@ -36,3 +38,14 @@ bernoulli lbl r =
 
 fair_coin :: Int -> Tree Bool
 fair_coin = flip bernoulli $ 1/2
+
+
+-- | Experimental
+
+-- uniform_prim :: (Show a, Typeable a) => Val ([a] -> Tree a)
+-- uniform_prim = VPrim f
+--   where
+--     f :: Show a => Val [a] -> InterpM (Exp (Tree a))
+--     f (VList l) = do
+--       lbl <- freshLbl
+--       return $ EVal $ VTree $ uniform lbl $ EVal <$> l

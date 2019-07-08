@@ -84,7 +84,11 @@ phi = go . subtree_map . labelled_subtrees
 
 generate :: Tree a -> Cotree a
 -- generate t = ana (phi t) (Hole 0)
-generate t = ana (phi t) (Hole $ label_of t)
+-- generate t = ana (phi t) (Hole $ label_of t)
+generate t = case t of
+  Split _ _ _ -> ana (phi t) (Hole $ label_of t)
+  Leaf x -> Fix $ LeafF x
+  Hole _ -> error "generate: tree can't be a single hole"
 
 -- prefixAlg :: NatAlgebra (Cotree a -> Tree a)
 -- prefixAlg O _ = Hole

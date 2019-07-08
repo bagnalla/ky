@@ -1,0 +1,12 @@
+
+func concat (l1 : [int], l2 : [int]) -> [int] :
+  destruct(l1, l2, \x:int. \xs:[int]. x :: concat(xs, l2))
+
+func head (l : [int]) -> int :
+  destruct(l, (0-1), \x:int. \xs:[int]. x)
+
+func tail (l : [int]) -> [int] :
+  destruct(l, []:[int], \x:int. \xs:[int]. xs)
+
+main:
+  x <- head(concat([0]:[int], [1]:[int]))
