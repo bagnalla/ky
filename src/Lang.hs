@@ -45,6 +45,9 @@ data Val a where
   VPair :: (Eq a, Show a, Eq b, Show b) => Val a -> Val b -> Val (a, b)
   VLam :: (Show a, Typeable a, Eq b, Show b) => Name a -> Exp b -> Val (a -> b)
   VPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Val (a -> b)
+  VPrim' :: (Show c, Typeable c) =>
+            (forall a. forall b. Val a -> InterpM (Exp b)) ->
+            Val (c -> d)
 
 data SomeVal where
   SomeVal :: forall a. (Show a, Typeable a) => Val a -> SomeVal

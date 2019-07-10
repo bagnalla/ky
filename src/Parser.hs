@@ -256,6 +256,12 @@ cWhile pos = do
       return $ L.IndentSome Nothing
         (\coms -> return (e, coms)) com
 
+cReturn :: SourcePos -> Parser (Com SourcePos)
+cReturn pos = do
+  symbol "return"
+  e <- expr
+  return $ CReturn pos e
+
 com :: Parser (Com SourcePos)
 com = do
   pos <- getSourcePos
@@ -263,6 +269,7 @@ com = do
     [ cSkip pos
     , cAbort pos
     , cObserve pos
+    , cReturn pos
     , cIf pos
     , cWhile pos
     , try $ cAssign pos
@@ -291,15 +298,25 @@ arrow_ty = do
   t <- ty
   return $ TArrow s t
 
+dist_ty :: Parser Type
+dist_ty = do
+  symbol "dist"
+  symbol "("
+  t <- ty
+  symbol ")"
+  return $ TDist t
+
 ty :: Parser Type
 ty = choice
   [ keyword "rational" >> return TRational
   , keyword "float" >> return TFloat
   , keyword "bool" >> return TBool
   , keyword "int" >> return TInteger
+  , dist_ty
   , pair_ty
   , list_ty
-  , arrow_ty ]
+  , arrow_ty
+  ]
 
 func_arg :: Parser (Id, Type)
 func_arg = do

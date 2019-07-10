@@ -1,0 +1,30 @@
+
+func head (l : [int]) -> int :
+  destruct(l, (0-1), \x:int. \xs:[int]. x)
+
+func tail (l : [int]) -> [int] :
+  destruct(l, []:[int], \x:int. \xs:[int]. xs)
+
+func nth (l : [int], n : int) -> int :
+  if n <= 0 then head(l) else nth(tail(l), n-1)
+
+dist list (d : dist(int), n : int) -> [int] :
+  i <- 0
+  l <- [] : [int]
+  while i < 1:
+    x <~ d
+    l <- x :: l
+    i <- i + 1
+  return l
+
+  # return ([] : [int])
+
+dist d(n : int, m : int) -> int :
+  b <~ bernoulli(1/2)
+  return (if b then n else m)
+
+main:
+  # x <~ d(10, 15)
+  l <~ list(uniform([1, 2, 3]:[int]), 3)
+  x <- nth(l, 0)
+  l <- [] : [int]

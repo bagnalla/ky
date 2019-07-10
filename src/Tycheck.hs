@@ -105,7 +105,9 @@ tycheckType (U.TList t) =
 tycheckType (U.TArrow s t) =
   case (tycheckType s, tycheckType t) of
     (SomeType s', SomeType t') -> SomeType $ TArrow s' t'  
-
+tycheckType (U.TDist t) =
+  case tycheckType t of
+    SomeType t' -> SomeType $ TDist t'
 
 -- | Typechecking expressions.
 
@@ -363,6 +365,10 @@ tycheckCom (U.CObserve pos e) = do
   case t of
     TBool -> return $ SomeCom TSt $ Observe e'
     _ -> typeError pos $ "expected Bool, got " ++ show t
+
+tycheckCom (U.CReturn pos e) = do
+  SomeExp t e' <- tycheckExp e
+  return $ SomeCom (TExp t) $ Return e'
 
 tycheckCom (U.CWhile pos e c) = do
   SomeExp t e' <- tycheckExp e

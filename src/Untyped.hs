@@ -41,6 +41,7 @@ data Type =
   | TPair Type Type
   | TList Type
   | TArrow Type Type
+  | TDist Type
   -- | TFun [Type] Type
   deriving Show
 
@@ -90,6 +91,7 @@ data Com a =
   | CSample a Id (Exp a)
   | CSeq a (Com a) (Com a)
   | CIte a (Exp a) (Com a) (Maybe (Com a))
+  | CReturn a (Exp a)
   -- Derived commands:
   | CFlip a (Com a) (Com a)
   | CObserve a (Exp a)
@@ -111,6 +113,7 @@ data_of_com (CAssign x _ _) = x
 data_of_com (CSample x _ _) = x
 data_of_com (CSeq x _ _) = x
 data_of_com (CIte x _ _ _) = x
+data_of_com (CReturn x _) = x
 data_of_com (CFlip x _ _) = x
 data_of_com (CObserve x _) = x
 data_of_com (CWhile x _ _) = x
@@ -151,6 +154,7 @@ instance ToSexp Type where
   toSexp (TPair s t) = "(TPair " ++ toSexp s ++ " " ++ toSexp t ++ ")"
   toSexp (TList t) = "(TList " ++ toSexp t ++ ")"
   toSexp (TArrow s t) = "(TArrow " ++ toSexp s ++ " " ++ toSexp t ++ ")"
+  toSexp (TDist t) = "(TDist " ++ toSexp t ++ ")"
 
 instance ToSexp (Exp a) where
   toSexp (ELit _ lit) = "(ELiteral " ++ toSexp lit ++ ")"
@@ -177,6 +181,7 @@ instance ToSexp (Com a) where
     "(CIte " ++ toSexp e ++ " " ++ toSexp c1 ++ " " ++ toSexp c2 ++ ")"
   toSexp (CFlip _ c1 c2) = "(CSeq " ++ toSexp c1 ++ " " ++ toSexp c2 ++ ")"
   toSexp (CObserve _ e) = "(CObserve " ++ toSexp e ++ ")"
+  toSexp (CReturn _ e) = "(CReturn " ++ toSexp e ++ ")"
   toSexp (CWhile _ e c) = "(CWhile " ++ toSexp e ++ " " ++ toSexp c ++ ")"
 
 instance ToSexp (Function a) where
