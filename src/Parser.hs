@@ -113,6 +113,22 @@ destruct pos = do
   symbol ")"
   return $ EDestruct pos l z f
 
+fst_proj :: SourcePos -> Parser (Exp SourcePos)
+fst_proj pos = do
+  symbol "fst"
+  symbol "("
+  p <- expr
+  symbol ")"
+  return $ EUnop pos UFst p
+
+snd_proj :: SourcePos -> Parser (Exp SourcePos)
+snd_proj pos = do
+  symbol "snd"
+  symbol "("
+  p <- expr
+  symbol ")"
+  return $ EUnop pos USnd p
+
 lam :: SourcePos -> Parser (Exp SourcePos)
 lam pos = do
   symbol "\\"
@@ -130,6 +146,8 @@ term = do
     [ nil pos
     , list pos
     , destruct pos
+    , fst_proj pos
+    , snd_proj pos
     , try $ pair pos
     , try $ call pos
     , try $ cond pos
@@ -308,15 +326,15 @@ dist_ty = do
 
 ty :: Parser Type
 ty = choice
-  [ keyword "rational" >> return TRational
+  [
+    -- try arrow_ty
+    keyword "rational" >> return TRational
   , keyword "float" >> return TFloat
   , keyword "bool" >> return TBool
   , keyword "int" >> return TInteger
-  , dist_ty
+  , try dist_ty
   , pair_ty
-  , list_ty
-  , arrow_ty
-  ]
+  , list_ty ]
 
 func_arg :: Parser (Id, Type)
 func_arg = do

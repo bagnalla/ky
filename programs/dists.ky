@@ -8,6 +8,9 @@ func tail (l : [int]) -> [int] :
 func nth (l : [int], n : int) -> int :
   if n <= 0 then head(l) else nth(tail(l), n-1)
 
+func map (f : int -> int, l : [int]) -> [int] :
+  destruct (f, [], \x:int. \xs:[int]. f(x) :: map f xs)
+
 dist list (d : dist(int), n : int) -> [int] :
   i <- 0
   l <- [] : [int]
