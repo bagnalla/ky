@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, GADTs, RankNTypes #-}
 {-# LANGUAGE DataKinds, StandaloneDeriving, TypeFamilies #-}
 {-# LANGUAGE TupleSections, TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-}
 
 module Lang where
 
@@ -17,14 +18,11 @@ import Distributions
 import Tree hiding (mu)
 import Util (debug, mapJoin)
 
--- This is weird but we have Show constraints all over the place for
--- debugging purposes, so we have a dummy instance for when the type
--- indices are arrow types.
+-- Dummy instances for arrow type indices.
+instance Eq (a -> b) where
+  _ == _ = False
 instance Show (a -> b) where
-  show f = "<function>"
-
-mu :: (a -> a) -> a
-mu f = f (mu f)
+  show _ = "<function>"
 
 type Name a = (String, Proxy a)
 
@@ -42,51 +40,42 @@ data Val a where
   VInteger :: Integer -> Val Integer
   VFloat :: Double -> Val Double
   VBool :: Bool -> Val Bool
-  VTree :: Tree (Exp a) -> Val (Tree a)
-  VList :: [Val a] -> Val [a]
-  VPair :: Val a -> Val b -> Val (a, b)
-  VLam :: Show a => Name a -> Exp b -> Val (a -> b)
+  VTree :: (Eq a, Show a) => Tree (Exp a) -> Val (Tree a)
+  VList :: (Eq a, Show a) => [Val a] -> Val [a]
+  VPair :: (Eq a, Show a, Eq b, Show b) => Val a -> Val b -> Val (a, b)
+  VLam :: (Show a, Typeable a, Eq b, Show b) => Name a -> Exp b -> Val (a -> b)
   VPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Val (a -> b)
 
 data SomeVal where
   SomeVal :: forall a. (Show a, Typeable a) => Val a -> SomeVal
 deriving instance Show SomeVal
 
--- data SomeNameVal where
---   SomeNameVal :: forall a. Typeable a => Name a -> Val a -> SomeNameVal
-
--- TODO: figure out how to support equality on trees, lists, and
--- pairs.
--- instance {-# INCOHERENT #-} Eq (Val a) where
--- instance {-# OVERLAPPING #-} Eq (Val a) where
 instance Eq (Val a) where
   VRational x == VRational y = x == y
   VInteger x == VInteger y = x == y
   VFloat x == VFloat y = x == y
   VBool x == VBool y = x == y
-  VTree _ == VTree _ = error "no equality on trees for now"
-  VList _ == VList _ = error "no equality on lists for now"
-  VPair _ _ == VPair _ _ = error "no equality on pairs for now"
-
--- -- instance {-# OVERLAPPING #-} Eq a => Eq (Val [a]) where
--- -- instance Eq a => Eq (Val [a]) where
--- instance {-# INCOHERENT #-} Eq a => Eq (Val [a]) where
---   VList l1 == VList l2 = l1 == l2
-
--- instance {-# OVERLAPPING #-} Eq a => Eq (Val (Tree a)) where
---   VTree x == VTree y = x == y
+  VTree x == VTree y = x == y
+  VList x == VList y = x == y
+  VPair x y == VPair x' y' = x == x' && y == y'
+  VLam x e == VLam x' e' =
+    if fst x == fst x' then
+      case nameEqT x x' of
+        Just Refl -> e == e'
+        Nothing -> False
+    else False
+  VPrim _ == VPrim _ = error "no equality on primitives for now"
 
 instance Show a => Show (Val a) where
-  show (VRational v) = "VRational " ++ show v
-  show (VInteger v) = "VInteger " ++ show v
-  show (VFloat v) = "VFloat " ++ show v
-  show (VBool b) = "VBool " ++ show b
-  show (VTree _) = "VTree"
-  show (VList _) = "VList"
-  show (VPair _ _) = "VPair"
-
--- instance {-# OVERLAPPING #-} Show a => Show (Val (Tree a)) where
---   show (VTree d) = "(VTree " ++ show d ++ ")"
+  show (VRational v) = "(VRational " ++ show v ++ ")"
+  show (VInteger v) = "(VInteger " ++ show v ++ ")"
+  show (VFloat v) = "(VFloat " ++ show v ++ ")"
+  show (VBool b) = "(VBool " ++ show b ++ ")"
+  show (VTree t) = "(VTree " ++ show t ++ ")"
+  show (VList l) = "(VList " ++ show l ++ ")"
+  show (VPair x y) = "(VPair " ++ show x ++ ", " ++ show y ++ ")"
+  show (VLam x e) = "(VLam " ++ show x ++ " " ++ show e ++ ")"
+  show (VPrim f) = "(VPrim " ++ show f ++ ")"
 
 data SomeNameVal where
   SomeNameVal :: forall a. (Show a, Typeable a) =>
@@ -96,15 +85,8 @@ instance Eq SomeNameVal where
   SomeNameVal (x1, _) v1 == SomeNameVal (x2, _) v2 =
     case cast v1 of
       Just v1' ->
-        -- debug ("x1: " ++ show x1) $
-        -- debug ("x2: " ++ show x2) $
-        -- debug ("v1: " ++ show v1) $
-        -- debug ("v2: " ++ show v2) $
         x1 == x2 && v1' == v2
       Nothing -> False
-
--- instance Eq StPkg where
---   _ == _ = False
 
 instance Show SomeNameVal where
   show (SomeNameVal (x, _) v) = "{" ++ show x ++ ", " ++ show v ++ "}"
@@ -205,19 +187,19 @@ data Exp a where
   EVar :: Name a -> Exp a
   EUnop :: (Typeable a, Show b, Typeable b) =>
            Unop a -> Exp b -> Exp (UnopResTy a b)
-  EBinop :: (Typeable a, Show b, Typeable b, Show c, Typeable c) =>
+  EBinop :: (Typeable a, Eq b, Show b, Typeable b, Eq c, Show c, Typeable c) =>
             Binop a -> Exp b -> Exp c -> Exp (BinopResTy a b c)
-  EPair :: (Show a, Typeable a, Show b, Typeable b) =>
-           Exp a -> Exp b -> Exp (a, b)
-  ENil :: (Show a, Typeable a) => Exp [a]
-  ECons :: (Show a, Typeable a) => Exp a -> Exp [a] -> Exp [a]
+  -- EPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
+  --          Exp a -> Exp b -> Exp (a, b)
+  ENil :: (Eq a, Show a, Typeable a) => Exp [a]
+  ECons :: (Eq a, Show a, Typeable a) => Exp a -> Exp [a] -> Exp [a]
   EDestruct :: (Show a, Typeable a, Show b) =>
                Exp [a] -> Exp b -> Exp (a -> [a] -> b) -> Exp b
   EUniform :: (Show a, Typeable a) => Exp [a] -> Exp (Tree a)
-  ELam :: (Show a, Typeable a, Show b, Typeable b) =>
+  ELam :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
           Name a -> Exp b -> Exp (a -> b)
   EApp :: (Show a, Typeable a, Show b) => Exp (a -> b) -> Exp a -> Exp b
-  ECom :: Show a => [SomeNameExp] -> Com (Exp a) -> Exp (Tree a)
+  ECom :: (Eq a, Show a) => [SomeNameExp] -> Com (Exp a) -> Exp (Tree a)
   ECond :: (Show a, Typeable a) => Exp Bool -> Exp a -> Exp a -> Exp a
   EPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Exp (a -> b)
 
@@ -320,7 +302,7 @@ fvs = go []
     go bound (EVar x) = if SomeName x `elem` bound then [] else [SomeName x]
     go bound (EUnop _ e) = go bound e
     go bound (EBinop _ e1 e2) = go bound e1 ++ go bound e2
-    go bound (EPair e1 e2) = go bound e1 ++ go bound e2
+    -- go bound (EPair e1 e2) = go bound e1 ++ go bound e2
     go bound (ECons e1 e2) = go bound e1 ++ go bound e2
     go bound (EDestruct l z f) = go bound l ++ go bound z ++ go bound f
     go bound (EApp e1 e2) = go bound e1 ++ go bound e2
@@ -338,8 +320,7 @@ subst x e (EVar y) =
     Nothing -> EVar y
 subst x e (EUnop u e1) = EUnop u $ subst x e e1
 subst x e (EBinop b e1 e2) = EBinop b (subst x e e1) (subst x e e2)
-subst x e (EPair e1 e2) =
-  EPair (subst x e e1) (subst x e e2)
+-- subst x e (EPair e1 e2) = EPair (subst x e e1) (subst x e e2)
 subst x e (ECons e1 e2) = ECons (subst x e e1) (subst x e e2)
 subst x e (EDestruct l z f) =
   EDestruct (subst x e l) (subst x e z) (subst x e f)
@@ -377,15 +358,15 @@ data Type a where
   TFloat :: Type Double
   TRational :: Type Rational
   TInteger :: Type Integer
-  TDist :: (Show a, Typeable a) => Type a -> Type (Tree a)
-  TList :: (Show a, Typeable a) => Type a -> Type [a]
-  TPair :: (Show a, Typeable a, Show b, Typeable b) =>
+  TDist :: (Eq a, Show a, Typeable a) => Type a -> Type (Tree a)
+  TList :: (Eq a, Show a, Typeable a) => Type a -> Type [a]
+  TPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
            Type a -> Type b -> Type (a, b)
-  TArrow :: (Show a, Typeable a, Show b, Typeable b) =>
+  TArrow :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
             Type a -> Type b -> Type (a -> b)
   TVar :: Type ()
   TSt :: Type St
-  TExp :: (Show a, Typeable a) => Type a -> Type (Exp a)
+  TExp :: (Eq a, Show a, Typeable a) => Type a -> Type (Exp a)
 deriving instance Show (Type a)
 
 -- instance Eq (Type a) where
@@ -397,5 +378,5 @@ deriving instance Show (Type a)
 --   -- TODO: finish
 
 data SomeTypeVal where
-  SomeTypeVal :: forall a. (Show a, Typeable a) =>
+  SomeTypeVal :: forall a. (Eq a, Show a, Typeable a) =>
                  Type a -> Val a -> SomeTypeVal

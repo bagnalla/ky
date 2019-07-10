@@ -106,10 +106,10 @@ eval (EBinop b e1 e2) st = do
     BPair ->
       return $ VPair v1 v2
 
-eval (EPair e1 e2) st = do
-  v1 <- eval e1 st
-  v2 <- eval e2 st
-  return $ VPair v1 v2
+-- eval (EPair e1 e2) st = do
+--   v1 <- eval e1 st
+--   v2 <- eval e2 st
+--   return $ VPair v1 v2
 
 -- eval (EList es) st = do
 --   vs <- mapM (flip eval st) es

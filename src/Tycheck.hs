@@ -22,14 +22,14 @@ import           Tree (Tree)
 import qualified Untyped as U
 
 data SomeExp where
-  SomeExp :: forall a. (Show a, Typeable a) => Type a -> Exp a -> SomeExp
+  SomeExp :: forall a. (Eq a, Show a, Typeable a) => Type a -> Exp a -> SomeExp
 
 data SomeNameExp where
-  SomeNameExp :: forall a. (Show a, Typeable a) =>
+  SomeNameExp :: forall a. (Eq a, Show a, Typeable a) =>
                  Name a -> Type a -> Exp a -> SomeNameExp
 
 data SomeType where
-  SomeType :: forall a. (Show a, Typeable a) => Type a -> SomeType
+  SomeType :: forall a. (Eq a, Show a, Typeable a) => Type a -> SomeType
 
 data SomeCom where
   SomeCom :: forall a. Show a => Type a -> Com a -> SomeCom
@@ -208,7 +208,8 @@ tycheckExp (U.EBinop pos binop e1 e2) = do
         Just Refl -> return $ SomeExp t2 $ L.ECons e1' e2'
         _ -> typeError pos $ "expected list type, got " ++ show t2
     U.BPair ->
-      return $ SomeExp (TPair t1 t2) $ L.EPair e1' e2'
+      -- return $ SomeExp (TPair t1 t2) $ L.EPair e1' e2'
+      return $ SomeExp (TPair t1 t2) $ L.EBinop L.BPair e1' e2'
 
 tycheckExp (U.ELam pos (Id x) t e) =
   case tycheckType t of
