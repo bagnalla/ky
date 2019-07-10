@@ -309,13 +309,6 @@ list_ty = do
   symbol "]"
   return $ TList t
 
-arrow_ty :: Parser Type
-arrow_ty = do
-  s <- ty
-  symbol "->"
-  t <- ty
-  return $ TArrow s t
-
 dist_ty :: Parser Type
 dist_ty = do
   symbol "dist"
@@ -324,17 +317,27 @@ dist_ty = do
   symbol ")"
   return $ TDist t
 
-ty :: Parser Type
-ty = choice
-  [
-    -- try arrow_ty
-    keyword "rational" >> return TRational
+atomic_ty :: Parser Type
+atomic_ty = choice
+  [ keyword "rational" >> return TRational
   , keyword "float" >> return TFloat
   , keyword "bool" >> return TBool
   , keyword "int" >> return TInteger
   , try dist_ty
-  , pair_ty
-  , list_ty ]
+  , try pair_ty
+  , list_ty
+  , parens ty ]
+
+ty :: Parser Type
+ty = do
+  s <- atomic_ty
+  x <- optional $ symbol "->"
+  case x of
+    Just _ -> do
+      t <- ty
+      return $ TArrow s t
+    Nothing ->
+      return s
 
 func_arg :: Parser (Id, Type)
 func_arg = do

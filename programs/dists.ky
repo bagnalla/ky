@@ -8,26 +8,27 @@ func tail (l : [int]) -> [int] :
 func nth (l : [int], n : int) -> int :
   if n <= 0 then head(l) else nth(tail(l), n-1)
 
-func map (f : int -> int, l : [int]) -> [int] :
-  destruct (f, [], \x:int. \xs:[int]. f(x) :: map f xs)
-
+# List distribution former
 dist list (d : dist(int), n : int) -> [int] :
   i <- 0
   l <- [] : [int]
-  while i < 1:
+  while i < n:
     x <~ d
     l <- x :: l
     i <- i + 1
   return l
 
-  # return ([] : [int])
+dist pair (d1 : dist(int), d2 : dist(int)) -> dist((int, int)) :
+  x <~ d1
+  y <~ d2
+  return (x, y)
 
-dist d(n : int, m : int) -> int :
-  b <~ bernoulli(1/2)
-  return (if b then n else m)
+# dist d(n : int, m : int) -> int :
+#   b <~ bernoulli(1/2)
+#   return (if b then n else m)
 
 main:
-  # x <~ d(10, 15)
   l <~ list(uniform([1, 2, 3]:[int]), 3)
   x <- nth(l, 0)
   l <- [] : [int]
+  # p <~ pair(uniform([0, 1]:[int]), uniform([1, 2]:[int]))
