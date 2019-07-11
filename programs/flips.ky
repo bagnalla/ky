@@ -1,8 +1,8 @@
 
 main:
   T <- 10
-  i <- 0.0
-  ct <- 0.0
+  i <- 0
+  ct <- 0
   while i < T:
     i <- i + 1
     s <~ bernoulli(1/2)

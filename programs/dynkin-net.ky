@@ -2,10 +2,10 @@
 # only tracks net position, not history
 
 main:
-    start <~ uniform([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    start <~ uniform([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [int])
     T <- 20
 
     pos <- start
     while pos < T:
-        r <~ uniform([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        r <~ uniform([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [int])
         pos <- pos + r

@@ -4,10 +4,10 @@ main:
   p2 <- 2
 
   # p1 is uniform from [J,Q,K]
-  p1 <~ uniform([0, 1, 2])
+  p1 <~ uniform([0, 1, 2] : [int])
 
   # p2 is uniform from [J,Q,K] - {p1}
-  p2 <~ uniform([0, 1, 2])
+  p2 <~ uniform([0, 1, 2] : [int])
   # p1 and p2 can't choose the same card
   observe(~(p1 = p2))
 

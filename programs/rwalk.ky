@@ -5,7 +5,7 @@ main:
     T <- 10
 
     pos <- start
-    hist <- [pos]
+    hist <- [pos] : [int]
     i <- 0
     while i < T:
         i <- i + 1

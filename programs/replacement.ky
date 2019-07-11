@@ -2,8 +2,8 @@ main:
   J <- 0
   Q <- 1
   K <- 2
-  x <~ uniform([J, Q, K])
-  y <~ uniform([J, Q, K])
+  x <~ uniform([J, Q, K] : [int])
+  y <~ uniform([J, Q, K] : [int])
   observe(~(y = x))
-  z <~ uniform([J, Q, K])
+  z <~ uniform([J, Q, K] : [int])
   observe(~(z = x) & ~(z = y))

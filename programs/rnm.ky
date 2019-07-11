@@ -1,8 +1,7 @@
 # https://arxiv.org/pdf/1710.09951.pdf (pg. 62)
 
-# problems:
-#   - representing dataset Q = [q1..qn] where q : D -> Z
-#   - representing q1..qn as query functions
+# func evalQ (i : int, d : int) -> int:
+#   pattern match i to return qi(d)
 
 main:
     N <- 10

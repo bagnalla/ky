@@ -1,17 +1,25 @@
 # https://arxiv.org/pdf/1710.09951.pdf (pg. 38)
 
-# assumes indexing for pairs as if 2-dim array
-#   i.e. E[0] = (0, 2) -> E[0][0] = 0, E[0][1] = 2
-#   adjust accordingly after pairs are implemented
+func head (l : [(int, int)]) -> (int, int) :
+  destruct(l, (0-1, 0-1), \x:(int, int). \xs:[(int, int)]. x)
+
+func tail (l : [(int, int)]) -> [(int, int)] :
+  destruct(l, []:[(int, int)], \x:(int, int). \xs:[(int, int)]. xs)
+
+func nth (l : [(int, int)], n : int) -> (int, int) :
+  if n <= 0 then head(l) else nth(tail(l), n-1)
+
+func size (l : [(int, int)]) -> int :
+  destruct(l, 0, \x:(int, int). \xs:[(int, int)]. 1 + size(xs))
 
 main:
     T <- 10
     # set up graph G
-    V <- [0, 1, 2, 3, 4]
-    E <- [(0, 2), (1, 2), (2, 3), (2, 4)]
-    C <- [0, 1, 2, 3]
+    V <- [0, 1, 2, 3, 4] : [int]
+    E <- [(0, 2), (1, 2), (2, 3), (2, 4)] : [(int, int)]
+    C <- [0, 1, 2, 3] : [int]
     # coloring map: -1 for no assigned color
-    w <- [(0, -1), (1, -1), (2, -1), (3, -1)]
+    w <- [(0, 0-1), (1, 0-1), (2, 0-1), (3, 0-1)] : [(int, int)]
 
     i <- 0
     while i < T:
@@ -20,27 +28,26 @@ main:
         v <~ uniform(V)
         c <~ uniform(C)
 
-        # enum edges for color conflicts (assume |E| = 4)
+        # enum edges for color conflicts
         j <- 0
-        while j < 4:
+        while j < size(E):
             # dodgy way of pattern checking for matching v
-            if E[j][0] = v:
-                # assumes |w| = |V| = 4
+            if fst(nth(E, j)) = v:
                 k <- 0
-                while k < 4:
+                while k < size(w):
                     # if color does not conflict, then valid
-                    if w[k][0] = E[j][1]:
-                        if w[k][1] != c:
+                    if fst(nth(w, k)) = snd(nth(E, j)):
+                        if ~(snd(nth(w, k)) = c):
                             valid <- true
 
                     k <- k + 1
                 # end while
             else:
-                if E[j][1] = v:
+                if snd(nth(E, j)) = v:
                     k <- 0
                     while k < 4:
-                        if w[k][0] = E[j][0]:
-                            if w[k][1] != c:
+                        if fst(nth(w, k)) = fst(nth(E, j)):
+                            if ~(snd(nth(w, k)) = c):
                                 valid <- true
 
                         k <- k + 1
@@ -55,8 +62,8 @@ main:
             j <- 0
             while j < 4:
                 # change mapped color for v
-                if w[j][0] = v:
-                    w[j][1] <- c
+                if fst(nth(w, j)) = v:
+                    snd(nth(w, j)) <- c
 
                 j <- j + 1
             # end while

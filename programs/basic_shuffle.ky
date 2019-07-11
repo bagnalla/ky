@@ -8,7 +8,7 @@ main:
   t <- 0
 
   # first shuffle
-  j <~ uniform([0, 1, 2])
+  j <~ uniform([0, 1, 2] : [int])
   if j = z_i:
     # swap z with z
     z <- z
@@ -26,7 +26,7 @@ main:
         x <- t
 
   # second shuffle
-  j <~ uniform([0, 1])
+  j <~ uniform([0, 1] : [int])
   if j = y_i:
     # swap y with y
     y <- y

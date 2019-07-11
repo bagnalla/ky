@@ -1,10 +1,10 @@
 # https://arxiv.org/pdf/1710.09951.pdf (pg. 65)
 
-# problems:
-#   - representation of dataset Q = [q1..qn]
-#   - representation of q1..qn as queries
-#       * assume evalQ(i, d) = qi(d)
-#   - returning list size
+func size (l : [(int, int)]) -> int:
+    destruct(l, 0, \x:(int, int). \xs:[(int, int)]. 1 + size(xs))
+
+# func evalQ (i : int, d : int) -> int:
+#   pattern match i to return qi(d)
 
 main:
     T <- 0
@@ -12,7 +12,7 @@ main:
     C <- 10
 
     i <- 1
-    out <- []
+    out <- [] : [(int, int)]
     t <~ laplacian(T)
     while (i <= N) & (size(out) < C):
         ans <- (0, 0)
