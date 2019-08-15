@@ -6,10 +6,13 @@ import Control.Monad.Reader
 import Control.Monad.State hiding (get)
 import qualified Control.Monad.State as S (get)
 
+import Data.List (intersect)
 import Data.Typeable
 
+import Dep
 import Distributions
 import Lang
+import Sexp
 import Tree
 import Util
 
@@ -143,10 +146,11 @@ eval (EApp f e) st = do
 
 eval (ECom args com) st = do
   st' <- mapM (\(SomeNameExp x e) -> SomeNameVal x <$> eval e st) args
-  VTree <$> interp com (Leaf st')
+  lbl <- freshLbl
+  VTree . set_label lbl <$> interp com (Leaf st')
 
 -- TODO: do we need to introduce labels here? I think it's OK if we
--- don't because nothing bad will happen but in principal they should
+-- don't because nothing bad will happen but in principle they should
 -- be there.
 eval (ECond b e1 e2) st = do
   b' <- is_true b st
@@ -161,7 +165,15 @@ eval (EUniform e) st = do
     VList vals -> return $ VTree $ uniform lbl $ EVal <$> vals
 
 
-interp :: Com a -> Tree St -> InterpM (Tree a)
+-- TODO: make this take the root label as an argument so parameterized
+-- commands can use fresh labels as the roots.
+
+interp' :: (Eq a, Show a) => Com a -> Tree St -> InterpM (Tree a)
+-- Use this for incremental reduction. Not working right though?
+-- interp' c t = canon <$> interp c t
+interp' = interp
+
+interp :: (Eq a, Show a) => Com a -> Tree St -> InterpM (Tree a)
 interp Skip t = return t
 interp (Assign x e) t = do
   mapJoin t $ \st -> do
@@ -176,19 +188,49 @@ interp (Sample x e) t = do
                  v' <- eval e' st
                  return $ upd x v' st) t'
 
-interp (Seq c1 c2) t = interp c1 t >>= interp c2
-  
-interp (Ite e c1 c2) t = do
+interp (Seq c1 c2) t = interp' c1 t >>= interp' c2
+
+interp (Ite e c1 c2) t =
   mapJoin t $ \st -> do
     fresh_lbl1 <- freshLbl
     fresh_lbl2 <- freshLbl
     b <- is_true e st
     if b then
-      set_label fresh_lbl1 <$> (interp c1 $ Leaf st)
+      set_label fresh_lbl1 <$> (interp' c1 $ Leaf st)
       else
-      set_label fresh_lbl2 <$> (interp c2 $ Leaf st)
+      set_label fresh_lbl2 <$> (interp' c2 $ Leaf st)
 
-interp (While e c) t = interp (Ite e (Seq c (While e c)) Skip) t
+interp (While e c) t =
+  let deps = var_deps c
+      svars = sample_vars c
+      sdeps = sample_deps svars deps
+      sdeps_in_e = intersect sdeps (id_of_name <$> fvs e) in
+    if not $ null sdeps_in_e then
+      -- Something in e depends on randomness.
+      -- debug "DETECTED RANDOM LOOP" $
+      case dep_cycle deps of
+        Just x ->
+          error $ "loop error: the variable '" ++ show x ++
+          "' depends on itself within the body of a loop"
+        Nothing ->
+          mapJoin t $ \st -> do
+          b <- is_true e st
+          if b then do
+            t' <- interp c $ Leaf st
+            fresh_lbl <- freshLbl
+            t'' <- mapJoin t' $ \st' -> do
+              b' <- is_true e st'
+              return $ if b' then Hole fresh_lbl else Leaf st'
+            return $ set_label fresh_lbl t''
+            else
+            return $ Leaf st
+    else
+      -- debug "DETECTED UNROLLABLE LOOP" $
+      -- Nothing in e depends on randomness so unfold the loop.
+      interp' (Ite e (Seq c (While e c)) Skip) t
+
+-- interp (While e c) t =
+--   interp' (Ite e (Seq c (While e c)) Skip) t
 
 interp (Return e) t = mapM (\st -> EVal <$> eval e st) t
 
@@ -197,13 +239,13 @@ interp (Observe e) t = do
     b <- is_true e st
     if b then return $ Leaf st else return $ Hole 0
 
-interp Abort t = interp (Observe $ EVal $ VBool False) t
+interp Abort t = interp' (Observe $ EVal $ VBool False) t
 
 
-runInterp :: Env -> Com a -> Tree St -> (Tree a, Int)
+runInterp :: (Eq a, Show a) => Env -> Com a -> Tree St -> (Tree a, Int)
 runInterp env c t =
-  runIdentity $ runStateT (runReaderT (interp c t) env) (-1)
+  runIdentity $ runStateT (runReaderT (interp' c t) env) (-1)
 
-runInterp' :: Env -> Com a -> Tree a
+runInterp' :: (Eq a, Show a) => Env -> Com a -> Tree a
 runInterp' env c =
   set_label 0 $ fst $ runInterp env c (Leaf empty)

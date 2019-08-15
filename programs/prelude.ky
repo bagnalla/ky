@@ -4,7 +4,7 @@ func head (l : [int]) -> int :
   destruct(l, (0-1), \x:int. \xs:[int]. x)
 
 func tail (l : [int]) -> [int] :
-  destruct(l, []:[int], \x:int. \xs:[int]. xs)
+  destruct(l, []:int, \x:int. \xs:[int]. xs)
 
 func concat (l1 : [int], l2 : [int]) -> [int] :
   destruct(l1, l2, \x:int. \xs:[int]. x :: concat(xs, l2))
@@ -12,11 +12,9 @@ func concat (l1 : [int], l2 : [int]) -> [int] :
 func reverse (l : [int]) -> [int] :
   destruct(l, []:[int], \x:int. \xs:[int]. concat(reverse(xs), [x]:[int]))
 
-func range_aux (n : int) -> [int] :
-  if n <= 0 then ([] : [int]) else (n-1) :: range_aux (n-1)
-
 func range (n : int) -> [int] :
-  reverse(range_aux(n))
+  if n <= 0 then [] : [int] else concat(range(n-1), [n-1]:[int])
 
 main:
-  x <~ uniform(range(10))
+  # x <~ uniform(range(10))
+  return range(10)

@@ -1,9 +1,9 @@
 {-# LANGUAGE GADTs, RankNTypes, StandaloneDeriving #-}
 module Inference
-  (generate_histogram, histogram_pmf, Hist(..), Pmf(..))
+  (counts_pmf, generate_histogram, histogram_pmf, Hist(..), Pmf(..))
 where
 
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (bimap, second)
 import Data.List (sum)
 import Data.Maybe (fromMaybe)
 import Data.Typeable
@@ -63,6 +63,14 @@ histogram_pmf ((x, counts) : rest) =
   in
     (x, normalized) : rest'
 
+
+-- | Sampling based approximate inference for trees of arbitrary type.
+
+counts_pmf :: [(a, Int)] -> [(a, Double)]
+counts_pmf cnts =
+  second ((/ c) . fromIntegral) <$> cnts
+  where
+    c = fromIntegral $ sum $ snd <$> cnts
 
 -- | Exact calculation of probabilities.
 

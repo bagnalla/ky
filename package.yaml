@@ -29,6 +29,7 @@ library:
   - megaparsec
   - parser-combinators
   - containers
+  - random
 
 executables:
   ky-exe:

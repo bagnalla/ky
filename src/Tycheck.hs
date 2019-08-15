@@ -13,13 +13,14 @@ import Data.Bifunctor (first, second)
 import Data.Typeable hiding (typeOf)
 import Text.Megaparsec
 
-import           Lang as L hiding (SomeNameExp, SomeVal)
+import           Lang as L hiding (SomeExp, SomeNameExp, SomeVal)
 import qualified Lang as L (SomeNameExp(..), SomeVal(..))
 import Primitives
 import           Symtab (Id(..), Symtab)
 import qualified Symtab as S (add, empty, get, fromList)
 import           Tree (Tree)
 import qualified Untyped as U
+import           Util (debug)
 
 data SomeExp where
   SomeExp :: forall a. (Eq a, Show a, Typeable a) => Type a -> Exp a -> SomeExp
@@ -32,7 +33,7 @@ data SomeType where
   SomeType :: forall a. (Eq a, Show a, Typeable a) => Type a -> SomeType
 
 data SomeCom where
-  SomeCom :: forall a. Show a => Type a -> Com a -> SomeCom
+  SomeCom :: forall a. (Eq a, Show a) => Type a -> Com a -> SomeCom
 deriving instance Show SomeCom
 
 typeEq :: Type a -> Type b -> Maybe (a :~: b)
@@ -208,7 +209,8 @@ tycheckExp (U.EBinop pos binop e1 e2) = do
       case typeEq (TList t1) t2 of
         -- Just Refl -> return $ SomeExp t2 $ L.EBinop BCons e1' e2'
         Just Refl -> return $ SomeExp t2 $ L.ECons e1' e2'
-        _ -> typeError pos $ "expected list type, got " ++ show t2
+        _ ->
+          typeError pos $ "expected list type, got " ++ show t2
     U.BPair ->
       -- return $ SomeExp (TPair t1 t2) $ L.EPair e1' e2'
       return $ SomeExp (TPair t1 t2) $ L.EBinop L.BPair e1' e2'
@@ -243,10 +245,21 @@ tycheckExp (U.ECall pos e1 args) =
         _ -> typeError pos $
              "expected arrow type in LHS of application, got " ++ show t
 
+-- tycheckExp (U.ENil pos t) =
+--   case tycheckType t of
+--     SomeType (TList t') -> return $ SomeExp (TList t') $ L.ENil
+--     _ -> typeError pos $ "expected list type, got " ++ show t
+
+-- TODO
 tycheckExp (U.ENil pos t) =
   case tycheckType t of
-    SomeType (TList t') -> return $ SomeExp (TList t') $ L.ENil
-    _ -> typeError pos $ "expected list type, got " ++ show t
+    SomeType t' ->
+      case t' of
+        TList t'' ->
+          return $ SomeExp (TList t'') L.ENil
+        _ ->
+          typeError pos $ "expected list type, got " ++ show t'
+      -- return $ SomeExp t' L.ENil
 
 tycheckExp (U.EDestruct pos l z f) = do
   SomeExp lt l' <- tycheckExp l

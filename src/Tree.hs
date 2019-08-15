@@ -37,6 +37,7 @@ data Tree a =
 
 tree_sexp :: Show a => Tree a -> String
 tree_sexp (Leaf x) = "(" ++ show x ++ ")"
+-- tree_sexp (Leaf x) = show x
 tree_sexp (Split n t1 t2) =
   "(" ++ fromMaybe "" (show <$> n) ++ " " ++
   tree_sexp t1 ++ " " ++ tree_sexp t2 ++ ")"
@@ -61,7 +62,7 @@ instance Applicative Tree where
 
 instance Monad Tree where
   (>>=) = bind
-  return a = pure a
+  return = pure
 
 -- Product distribution trees.
 product_tree :: Tree a -> Tree b -> Tree (a, b)
@@ -76,10 +77,27 @@ snd_tree = fmap snd
 
 set_label :: Int -> Tree a -> Tree a
 set_label n (Split Nothing t1 t2) = Split (Just n) t1 t2
+set_label m (Split (Just n) t1 t2) =
+  change_label n m $ Split (Just n) t1 t2
 -- set_label n t@(Split (Just m) _ _) =
 --   error $ "set_label: trying to set label " ++ show n ++
 --   ", already has label " ++ show m
 set_label _ t = t
+
+-- change_label :: Int -> Int -> Tree a -> Tree a
+-- change_label _ _ (Leaf x) = Leaf x
+-- change_label n m (Split lbl t1 t2) =
+--   Split (case lbl of
+--            Just lbl' -> if lbl' == n then Just m else Just lbl'
+--            Nothing -> Nothing) -- TODO: cleanup
+--   (change_label n m t1) (change_label n m t2)
+
+change_label :: Int -> Int -> Tree a -> Tree a
+change_label _ _ (Leaf x) = Leaf x
+change_label n m (Split lbl t1 t2) =
+  Split (fmap (\x -> if x == n then m else x) lbl)
+  (change_label n m t1) (change_label n m t2)
+change_label n m (Hole lbl) = Hole $ if lbl == n then m else lbl
 
 label_of :: Tree a -> Int
 label_of (Split (Just lbl) _ _) = lbl
@@ -245,28 +263,35 @@ path_labels :: Path -> Tree a -> [Int]
 path_labels (b:bs) (Split lbl t1 t2) =
   (case lbl of
      Just lbl' -> [lbl']
-     Nothing -> []) ++ path_labels bs (if b then t1 else t2)
+     Nothing -> []) ++ path_labels bs (if b then t2 else t1)
 path_labels _ _ = []
+
+-- compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
+-- compatible_for_swap t p1 p2 =
+--   let t1 = get_subtree p1 t
+--       t2 = get_subtree p2 t
+--       t1_labels = path_labels p1 t
+--       t2_labels = path_labels p2 t
+--       t1_holes = holes t1
+--       t2_holes = holes t2 in
+--     t1 == t2 &&
+--     isSubsetOf t1_holes t2_labels &&
+--     isSubsetOf t2_holes t1_labels
+--     -- && False
 
 compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
 compatible_for_swap t p1 p2 =
   let t1 = get_subtree p1 t
       t2 = get_subtree p2 t
       t1_labels = path_labels p1 t
-      t2_labels = path_labels p2 t
-      t1_holes = holes t1
-      t2_holes = holes t2 in
-    t1 == t2 &&
-    isSubsetOf t1_holes t2_labels &&
-    isSubsetOf t2_holes t1_labels
-    -- && False
+      t2_labels = path_labels p2 t in
+    t1 == t2 && setEq t1_labels t2_labels
 
 -- If there are two duplicate leaves at the same level, group them
 -- together as siblings. Doesn't necessarily group all such duplicates
 -- together, but will do at least one grouping if possible. We can
 -- iteratively apply this function together with reduce to
 -- canonicalize a tree.
--- TODO: fix for labelled trees.
 group_dupes :: Eq a => Tree a -> Tree a
 group_dupes t = foldl f t [0 .. depth t]
   where
@@ -304,8 +329,8 @@ canon t =
   let
     (t1, ps) = reduce_whole t
     t2 = apply_patches ps t1
-    -- t3 = group_dupes t -- TODO: fix
-    (t4, ps') = reduce t2
+    t3 = group_dupes t -- TODO: fix
+    (t4, ps') = reduce t3
     t5 = apply_patches ps' t4
     t6 = reorder t5
     -- t6 = t5

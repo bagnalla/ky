@@ -63,3 +63,6 @@ mapJoin x g = join <$> (mapM g x)
 
 isSubsetOf :: Eq a => [a] -> [a] -> Bool
 isSubsetOf xs ys = all (`elem` ys) xs
+
+setEq :: Eq a => [a] -> [a] -> Bool
+setEq xs ys = isSubsetOf xs ys && isSubsetOf ys xs

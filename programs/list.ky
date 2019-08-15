@@ -3,4 +3,6 @@ func map (f : int->int, l : [int]) -> [int] :
   destruct (l, []:[int], \x:int. \xs:[int]. f(x) :: map(f, xs))
 
 main:
-  x <- [1, 2, 3] : [int]
+  incr <- \x:int. x+1
+  x <- map(incr, [1, 2, 3] : [int])
+  return x

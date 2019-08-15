@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, GADTs, RankNTypes #-}
 {-# LANGUAGE DataKinds, StandaloneDeriving, TypeFamilies #-}
 {-# LANGUAGE TupleSections, TypeOperators #-}
-{-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-}
 
 module Lang where
 
@@ -15,6 +14,7 @@ import Data.Proxy
 import Data.Typeable
 
 import Distributions
+import Symtab (Id(..))
 import Tree hiding (mu)
 import Util (debug, mapJoin)
 
@@ -34,6 +34,9 @@ instance Eq SomeName where
     case cast x of
       Just x' -> x' == y
       Nothing -> False
+
+id_of_name :: SomeName -> Id
+id_of_name (SomeName (x, _)) = Id x
 
 data Val a where
   VRational :: Rational -> Val Rational
@@ -69,16 +72,27 @@ instance Eq (Val a) where
     else False
   VPrim _ == VPrim _ = error "no equality on primitives for now"
 
+-- instance Show a => Show (Val a) where
+--   show (VRational v) = "(VRational " ++ show v ++ ")"
+--   show (VInteger v) = "(VInteger " ++ show v ++ ")"
+--   show (VFloat v) = "(VFloat " ++ show v ++ ")"
+--   show (VBool b) = "(VBool " ++ show b ++ ")"
+--   show (VTree t) = "(VTree " ++ show t ++ ")"
+--   show (VList l) = "(VList " ++ show l ++ ")"
+--   show (VPair x y) = "(VPair " ++ show x ++ ", " ++ show y ++ ")"
+--   show (VLam x e) = "(VLam " ++ show x ++ " " ++ show e ++ ")"
+--   show (VPrim f) = "(VPrim " ++ show f ++ ")"
+
 instance Show a => Show (Val a) where
-  show (VRational v) = "(VRational " ++ show v ++ ")"
-  show (VInteger v) = "(VInteger " ++ show v ++ ")"
-  show (VFloat v) = "(VFloat " ++ show v ++ ")"
-  show (VBool b) = "(VBool " ++ show b ++ ")"
-  show (VTree t) = "(VTree " ++ show t ++ ")"
-  show (VList l) = "(VList " ++ show l ++ ")"
-  show (VPair x y) = "(VPair " ++ show x ++ ", " ++ show y ++ ")"
-  show (VLam x e) = "(VLam " ++ show x ++ " " ++ show e ++ ")"
-  show (VPrim f) = "(VPrim " ++ show f ++ ")"
+  show (VRational v) = "VRational " ++ show v
+  show (VInteger v) = "VInteger " ++ show v
+  show (VFloat v) = "VFloat " ++ show v
+  show (VBool b) = "VBool " ++ show b
+  show (VTree t) = "VTree " ++ show t
+  show (VList l) = "VList " ++ show l
+  show (VPair x y) = "VPair " ++ show x ++ " " ++ show y
+  show (VLam x e) = "VLam " ++ show x ++ " " ++ show e
+  show (VPrim f) = "VPrim " ++ show f
 
 data SomeNameVal where
   SomeNameVal :: forall a. (Show a, Typeable a) =>
@@ -206,6 +220,10 @@ data Exp a where
   ECond :: (Show a, Typeable a) => Exp Bool -> Exp a -> Exp a -> Exp a
   EPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Exp (a -> b)
 
+data SomeExp where
+  SomeExp :: forall a. (Show a, Typeable a) => Exp a -> SomeExp
+deriving instance Show SomeExp
+
 data SomeNameExp where
   SomeNameExp :: forall a. (Show a, Typeable a) =>
                  Name a -> Exp a -> SomeNameExp
@@ -294,6 +312,11 @@ instance Show a => Show (Com a) where
   show (Observe b) = "(Observe " ++ show b ++ ")"
   show (While b c) = "(While " ++ show b ++ ", " ++ show c ++ ")"
 
+-- Decompose a sequence of commands into a list of commands.
+com_list :: Com a -> ([Com St], Com a)
+com_list (Seq c1 c2) = (cs ++ [c], c2)
+  where (cs, c) = com_list c1
+com_list c = ([], c)
 
 -- | Capture-avoiding substitution.
 
@@ -305,7 +328,6 @@ fvs = go []
     go bound (EVar x) = if SomeName x `elem` bound then [] else [SomeName x]
     go bound (EUnop _ e) = go bound e
     go bound (EBinop _ e1 e2) = go bound e1 ++ go bound e2
-    -- go bound (EPair e1 e2) = go bound e1 ++ go bound e2
     go bound (ECons e1 e2) = go bound e1 ++ go bound e2
     go bound (EDestruct l z f) = go bound l ++ go bound z ++ go bound f
     go bound (EApp e1 e2) = go bound e1 ++ go bound e2
@@ -323,7 +345,6 @@ subst x e (EVar y) =
     Nothing -> EVar y
 subst x e (EUnop u e1) = EUnop u $ subst x e e1
 subst x e (EBinop b e1 e2) = EBinop b (subst x e e1) (subst x e e2)
--- subst x e (EPair e1 e2) = EPair (subst x e e1) (subst x e e2)
 subst x e (ECons e1 e2) = ECons (subst x e e1) (subst x e e2)
 subst x e (EDestruct l z f) =
   EDestruct (subst x e l) (subst x e z) (subst x e f)

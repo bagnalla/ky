@@ -67,7 +67,10 @@ cotreeMap f = cata alg
 -- canon_coalg = lift_to_coalg canon
 
 subtree_map :: [Tree a] -> Int -> Tree a
-subtree_map [] n = error $ "subtree_map: index " ++ show n ++ " not found"
+-- Any hole pointing to a nonexistent label are taken to be pointing
+-- to themselves (divergent)
+subtree_map [] n = Hole n
+-- subtree_map [] n = error $ "subtree_map: index " ++ show n ++ " not found"
 subtree_map (t@(Split (Just n) _ _):ts) m = if n == m then t
                                             else subtree_map ts m
 subtree_map (_:ts) n = subtree_map ts n

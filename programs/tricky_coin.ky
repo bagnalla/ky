@@ -4,7 +4,7 @@ main:
   coin_weight <- if is_tricky_coin then 9/10 else 1/2
     
   i <- 0
-  while i < 5:
+  while i < 10:
     i <- i + 1
     x <~ bernoulli(coin_weight)
     observe x
@@ -15,3 +15,5 @@ main:
   # x4 <~ bernoulli(coin_weight)
   # x5 <~ bernoulli(coin_weight)
   # observe x1 & x2 & x3 & x4 & x5
+
+  return is_tricky_coin
