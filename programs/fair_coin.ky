@@ -9,3 +9,4 @@ main:
   while x = y:
     x <~ bernoulli(p)
     y <~ bernoulli(p)
+  return x

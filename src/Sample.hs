@@ -1,6 +1,7 @@
 module Sample where
 
 import Control.Monad.State
+import System.Random
 
 import Cotree
 import Datatypes
@@ -38,6 +39,13 @@ sample_tree = run_sampler . sample
 
 n_samples :: Cotree a -> Int -> Sampler [a]
 n_samples t n = mapM (const $ sample t) [0..n]
+
+samplerIO :: Tree a -> IO a
+samplerIO t = do
+  g <- newStdGen
+  let bits = randoms g :: [Bool]
+  return $ eval_sampler (sample (generate t)) bits
+
 
 -- Define zippers over cotrees.
 data Walk a = L (Cotree a) | R (Cotree a)

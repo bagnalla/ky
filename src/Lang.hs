@@ -1,6 +1,24 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, GADTs, RankNTypes #-}
 {-# LANGUAGE DataKinds, StandaloneDeriving, TypeFamilies #-}
 {-# LANGUAGE TupleSections, TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+
+-- | GADT representation of program syntax. In addition to the regular
+-- type index 'a' denoting the type of the value/expression/etc.,
+-- there are two type parameters 'm' and 'g', both of kind '* ->
+-- *'. 'g' is the type constructor for distributions, and 'm' a type
+-- constructor for distribution constructing computations. 'g' should
+-- generally be viewable as a probability monad (i.e., the Giry
+-- monad). 'm' is only used for primitive functions (e.g., VPrim).
+
+-- | For example, in the tree interpretation (see TreeInterp.hs), we
+-- set g = Tree and m = InterpM (a combined reader and state monad
+-- used for constructing trees). Also see IOInterp.hs for an example
+-- with g = IO and m = Identity.
+
+-- | The parser needn't be aware of our choice of 'm' and 'g', but
+-- they must be chosen prior to typechecking.
 
 module Lang where
 
@@ -13,9 +31,9 @@ import Data.Bifunctor (first)
 import Data.Proxy
 import Data.Typeable
 
+import Classes
 import Distributions
 import Symtab (Id(..))
-import Tree hiding (mu)
 import Util (debug, mapJoin)
 
 -- Dummy instances for arrow type indices.
@@ -38,31 +56,38 @@ instance Eq SomeName where
 id_of_name :: SomeName -> Id
 id_of_name (SomeName (x, _)) = Id x
 
-data Val a where
-  VRational :: Rational -> Val Rational
-  VInteger :: Integer -> Val Integer
-  VFloat :: Double -> Val Double
-  VBool :: Bool -> Val Bool
-  VTree :: (Eq a, Show a) => Tree (Exp a) -> Val (Tree a)
-  VList :: (Eq a, Show a) => [Val a] -> Val [a]
-  VPair :: (Eq a, Show a, Eq b, Show b) => Val a -> Val b -> Val (a, b)
-  VLam :: (Show a, Typeable a, Eq b, Show b) => Name a -> Exp b -> Val (a -> b)
-  VPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Val (a -> b)
-  VPrim' :: (Show c, Typeable c) =>
-            (forall a. forall b. Val a -> InterpM (Exp b)) ->
-            Val (c -> d)
+data Val (m :: * -> *) (g :: * -> *) (a :: *) where
+  VRational :: Rational -> Val m g Rational
+  VInteger :: Integer -> Val m g Integer
+  VFloat :: Double -> Val m g Double
+  VBool :: Bool -> Val m g Bool
+  VDist :: (Eq a, Show a) => g (Exp m g a) -> Val m g (g a)
+  VNil :: (Eq a, Show a) => Val m g [a]
+  VCons :: (Eq a, Show a, Typeable a) =>
+           Val m g a -> Val m g [a] -> Val m g [a]
+  VPair :: (Eq a, Show a, Eq b, Show b) =>
+           Val m g a -> Val m g b -> Val m g (a, b)
+  VLam :: (Show a, Typeable a, Eq b, Show b) =>
+          Name a -> Exp m g b -> Val m g (a -> b)
+  VPrim :: (Show a, Typeable a) =>
+           (Val m g a -> m (Exp m g b)) -> Val m g (a -> b)
+  -- Experimental/unused. Polymorphic primitives.
+  -- VPrim' :: (Show c, Typeable c) =>
+  --           (forall a b. Val m g a -> m (Exp m g b)) -> Val m g (c -> d)
 
-data SomeVal where
-  SomeVal :: forall a. (Show a, Typeable a) => Val a -> SomeVal
-deriving instance Show SomeVal
+data SomeVal m g where
+  SomeVal :: forall m g a. (Show a, Typeable a) => Val m g a -> SomeVal m g
+deriving instance Show (SomeVal m g)
 
-instance Eq (Val a) where
+instance Eq (Val m g a) where
   VRational x == VRational y = x == y
   VInteger x == VInteger y = x == y
   VFloat x == VFloat y = x == y
   VBool x == VBool y = x == y
-  VTree x == VTree y = x == y
-  VList x == VList y = x == y
+  VDist _ == VDist _ = error "no equality on dists"
+  -- VDist x == VDist y = x == y
+  -- VList x == VList y = x == y
+  VNil == VNil = True
   VPair x y == VPair x' y' = x == x' && y == y'
   VLam x e == VLam x' e' =
     if fst x == fst x' then
@@ -72,53 +97,46 @@ instance Eq (Val a) where
     else False
   VPrim _ == VPrim _ = error "no equality on primitives for now"
 
--- instance Show a => Show (Val a) where
---   show (VRational v) = "(VRational " ++ show v ++ ")"
---   show (VInteger v) = "(VInteger " ++ show v ++ ")"
---   show (VFloat v) = "(VFloat " ++ show v ++ ")"
---   show (VBool b) = "(VBool " ++ show b ++ ")"
---   show (VTree t) = "(VTree " ++ show t ++ ")"
---   show (VList l) = "(VList " ++ show l ++ ")"
---   show (VPair x y) = "(VPair " ++ show x ++ ", " ++ show y ++ ")"
---   show (VLam x e) = "(VLam " ++ show x ++ " " ++ show e ++ ")"
---   show (VPrim f) = "(VPrim " ++ show f ++ ")"
-
-instance Show a => Show (Val a) where
+instance Show a => Show (Val m g a) where
   show (VRational v) = "VRational " ++ show v
   show (VInteger v) = "VInteger " ++ show v
   show (VFloat v) = "VFloat " ++ show v
   show (VBool b) = "VBool " ++ show b
-  show (VTree t) = "VTree " ++ show t
-  show (VList l) = "VList " ++ show l
+  -- show (VDist t) = "VDist " ++ show t
+  show (VDist _) = "VDist"
+  -- show (VList l) = "VList " ++ show l
+  show VNil = "VNil"
+  show (VCons hd tl) = "VCons " ++ show hd ++ " " ++ show tl
   show (VPair x y) = "VPair " ++ show x ++ " " ++ show y
   show (VLam x e) = "VLam " ++ show x ++ " " ++ show e
   show (VPrim f) = "VPrim " ++ show f
 
-data SomeNameVal where
-  SomeNameVal :: forall a. (Show a, Typeable a) =>
-                 Name a -> Val a -> SomeNameVal
+data SomeNameVal m g where
+  SomeNameVal :: forall m g a. (Typeable m, Typeable g, Show a, Typeable a) =>
+                 Name a -> Val m g a -> SomeNameVal m g
 
-instance Eq SomeNameVal where
+instance Eq (SomeNameVal m g) where
   SomeNameVal (x1, _) v1 == SomeNameVal (x2, _) v2 =
     case cast v1 of
       Just v1' ->
         x1 == x2 && v1' == v2
       Nothing -> False
 
-instance Show SomeNameVal where
+instance Show (SomeNameVal m g) where
   show (SomeNameVal (x, _) v) = "{" ++ show x ++ ", " ++ show v ++ "}"
 
-type St = [SomeNameVal]
-type Env = [SomeNameExp]
+type St m g = [SomeNameVal m g]
+type Env m g = [SomeNameExp m g]
 
-empty :: St
+empty :: St m g
 empty = []
 
 nameEqT :: (Typeable a, Typeable b) => Name a -> Name b -> Maybe (a :~: b)
 nameEqT _ _ = eqT
 
 -- Replace old entries instead of shadowing.
-upd :: (Show a, Typeable a) => Name a -> Val a -> St -> St
+upd :: (Typeable m, Typeable g, Show a, Typeable a) =>
+       Name a -> Val m g a -> St m g -> St m g
 upd x v [] = [SomeNameVal x v]
 upd x v (SomeNameVal x' v' : st) =
   if fst x == fst x' then
@@ -128,7 +146,8 @@ upd x v (SomeNameVal x' v' : st) =
   else
     SomeNameVal x' v' : upd x v st
 
-get :: Typeable a => Name a -> St -> Maybe (Val a)
+get :: (Typeable m, Typeable g, Typeable a) =>
+       Name a -> St m g -> Maybe (Val m g a)
 get _ [] = Nothing
 get x (SomeNameVal y v : rest) =
   case cast (y, v) of
@@ -136,7 +155,8 @@ get x (SomeNameVal y v : rest) =
       if x == y' then Just v' else get x rest
     _ -> get x rest
 
-envGet :: Typeable a => Name a -> Env -> Maybe (Exp a)
+envGet :: (Typeable m, Typeable g, Typeable a) =>
+          Name a -> Env m g -> Maybe (Exp m g a)
 envGet _ [] = Nothing
 envGet x (SomeNameExp y v : rest) =
   case cast (y, v) of
@@ -169,7 +189,6 @@ data BinopTy =
   | BTOr
   | BTEq
   | BTLt
-  | BTPair
 
 data Binop a where
   BPlus :: Binop BTPlus
@@ -179,7 +198,6 @@ data Binop a where
   BOr :: Binop BTOr
   BEq :: Binop BTEq
   BLt :: Binop BTLt
-  BPair :: Binop BTPair
 deriving instance Eq (Binop a)
 deriving instance Show (Binop a)
 
@@ -197,39 +215,38 @@ type family BinopResTy (a :: BinopTy) (b :: *) (c :: *) where
   BinopResTy BTOr Bool Bool = Bool
   BinopResTy BTEq t t = Bool
   BinopResTy BTLt t t = Bool
-  BinopResTy BTPair s t = (s, t)
 
-data Exp a where
-  EVal :: Val a -> Exp a
-  EVar :: Name a -> Exp a
-  EUnop :: (Typeable a, Show b, Typeable b) =>
-           Unop a -> Exp b -> Exp (UnopResTy a b)
-  EBinop :: (Typeable a, Eq b, Show b, Typeable b, Eq c, Show c, Typeable c) =>
-            Binop a -> Exp b -> Exp c -> Exp (BinopResTy a b c)
-  -- EPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
-  --          Exp a -> Exp b -> Exp (a, b)
-  ENil :: (Eq a, Show a, Typeable a) => Exp [a]
-  ECons :: (Eq a, Show a, Typeable a) => Exp a -> Exp [a] -> Exp [a]
+data Exp (m :: * -> *) (g :: * -> *) (a :: *) where
+  EVal :: Val m g a -> Exp m g a
+  EVar :: Name a -> Exp m g a
+  EUnop :: (Typeable m, Typeable g, Typeable a, Show b, Typeable b) =>
+           Unop a -> Exp m g b -> Exp m g (UnopResTy a b)
+  EBinop :: (Typeable m, Typeable g, Typeable a, Eq b, Show b, Typeable b) =>
+            Binop a -> Exp m g b -> Exp m g b -> Exp m g (BinopResTy a b b)
+  EPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
+           Exp m g a -> Exp m g b -> Exp m g (a, b)
+  ENil :: (Eq a, Show a, Typeable a) => Exp m g [a]
+  ECons :: (Eq a, Show a, Typeable a) => Exp m g a -> Exp m g [a] -> Exp m g [a]
   EDestruct :: (Show a, Typeable a, Show b) =>
-               Exp [a] -> Exp b -> Exp (a -> [a] -> b) -> Exp b
-  EUniform :: (Show a, Typeable a) => Exp [a] -> Exp (Tree a)
+               Exp m g [a] -> Exp m g b -> Exp m g (a -> [a] -> b) -> Exp m g b
+  EUniform :: (Eq a, Show a, Typeable a) => Exp m g [a] -> Exp m g (g a)
   ELam :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
-          Name a -> Exp b -> Exp (a -> b)
-  EApp :: (Show a, Typeable a, Show b) => Exp (a -> b) -> Exp a -> Exp b
-  ECom :: (Eq a, Show a) => [SomeNameExp] -> Com (Exp a) -> Exp (Tree a)
-  ECond :: (Show a, Typeable a) => Exp Bool -> Exp a -> Exp a -> Exp a
-  EPrim :: (Show a, Typeable a) => (Val a -> InterpM (Exp b)) -> Exp (a -> b)
+          Name a -> Exp m g b -> Exp m g (a -> b)
+  EApp :: (Show a, Typeable a, Show b) => Exp m g (a -> b) -> Exp m g a -> Exp m g b
+  ECom :: (Eq a, Show a) => [SomeNameExp m g] -> Com m g (Exp m g a) -> Exp m g (g a)
+  ECond :: (Show a, Typeable a) => Exp m g Bool -> Exp m g a -> Exp m g a -> Exp m g a
+  EPrim :: (Show a, Typeable a) => (Val m g a -> m (Exp m g b)) -> Exp m g (a -> b)
 
-data SomeExp where
-  SomeExp :: forall a. (Show a, Typeable a) => Exp a -> SomeExp
-deriving instance Show SomeExp
+data SomeExp m g where
+  SomeExp :: forall m g a. (Show a, Typeable a) => Exp m g a -> SomeExp m g
+deriving instance Show (SomeExp m g)
 
-data SomeNameExp where
-  SomeNameExp :: forall a. (Show a, Typeable a) =>
-                 Name a -> Exp a -> SomeNameExp
-deriving instance Show SomeNameExp
+data SomeNameExp m g where
+  SomeNameExp :: forall m g a. (Typeable g, Show a, Typeable a) =>
+                 Name a -> Exp m g a -> SomeNameExp m g
+deriving instance Show (SomeNameExp m g)
 
-instance Eq (Exp a) where
+instance Eq (Exp m g a) where
   EVal x == EVal y = x == y
   EVar x == EVar y = x == y
   EUnop u1 e1 == EUnop u2 e2 =
@@ -246,7 +263,7 @@ instance Eq (Exp a) where
   -- TODO finish
   _ == _ = False
 
-instance Show a => Show (Exp a) where
+instance Show a => Show (Exp m g a) where
   show (EVal v) = "(EVal " ++ show v ++ ")"
   show (EVar x) = "(EVar " ++ show x ++ ")"
   show (EUnop u e) = "(EUnop " ++ show u ++ " " ++ show e ++ ")"
@@ -265,22 +282,21 @@ instance Show a => Show (Exp a) where
   show (EUniform l) = "(EUniform " ++ show l ++ ")"
 
 
-type Pattern = forall a. Tree a -> Tree a -> Tree a
-
-data Com a where 
-  Skip :: Com St
-  Assign :: (Show a, Typeable a) => Name a -> Exp a -> Com St
-  Seq :: Com St -> Com a -> Com a
-  Ite :: Exp Bool -> Com a -> Com a -> Com a
-  Sample :: (Show a, Typeable a) => Name a -> Exp (Tree a) -> Com St
-  Observe :: Exp Bool -> Com St
-  Return :: (Show a, Typeable a) => Exp a -> Com (Exp a)
+data Com (m :: * -> *) (g :: * -> *) (a :: *) where
+  Skip :: Com m g (St m g)
+  Assign :: (Typeable m, Typeable g, Show a, Typeable a) =>
+            Name a -> Exp m g a -> Com m g (St m g)
+  Seq :: Com m g (St m g) -> Com m g a -> Com m g a
+  Ite :: Exp m g Bool -> Com m g a -> Com m g a -> Com m g a
+  Sample :: (Typeable m, Typeable g, Show (g a), Show a, Typeable a) =>
+            Name a -> Exp m g (g a) -> Com m g (St m g)
+  Observe :: Exp m g Bool -> Com m g (St m g)
+  Return :: (Show a, Typeable a) => Exp m g a -> Com m g (Exp m g a)
+  While :: Exp m g Bool -> Com m g (St m g) -> Com m g (St m g)
   -- Derived commands:
-  Abort :: Com St
-  -- Flip :: Com -> Com -> Com
-  While :: Exp Bool -> Com St -> Com St
+  Abort :: Com m g (St m g)
 
-instance Eq (Com a) where
+instance Eq (Com m g a) where
   Skip == Skip = True
   Abort == Abort = True
   Assign x e == Assign x' e' =
@@ -299,7 +315,7 @@ instance Eq (Com a) where
   While b c == While b' c' = b == b' && c == c'
   _ == _ = False
 
-instance Show a => Show (Com a) where
+instance Show a => Show (Com m g a) where
   show Skip = "Skip"
   show Abort = "Abort"
   show (Assign x e) = "(Assign " ++ show x ++ ", " ++ show e ++ ")"
@@ -313,7 +329,7 @@ instance Show a => Show (Com a) where
   show (While b c) = "(While " ++ show b ++ ", " ++ show c ++ ")"
 
 -- Decompose a sequence of commands into a list of commands.
-com_list :: Com a -> ([Com St], Com a)
+com_list :: Com m g a -> ([Com m g (St m g)], Com m g a)
 com_list (Seq c1 c2) = (cs ++ [c], c2)
   where (cs, c) = com_list c1
 com_list c = ([], c)
@@ -321,10 +337,10 @@ com_list c = ([], c)
 -- | Capture-avoiding substitution.
 
 -- Free variables of an expression.
-fvs :: Typeable a => Exp a -> [SomeName]
+fvs :: Typeable a => Exp m g a -> [SomeName]
 fvs = go []
   where
-    go :: Typeable a => [SomeName] -> Exp a -> [SomeName]
+    go :: Typeable a => [SomeName] -> Exp m g a -> [SomeName]
     go bound (EVar x) = if SomeName x `elem` bound then [] else [SomeName x]
     go bound (EUnop _ e) = go bound e
     go bound (EBinop _ e1 e2) = go bound e1 ++ go bound e2
@@ -338,7 +354,8 @@ fvs = go []
     go _ _ = []
 
 -- Substitution.
-subst :: (Show a, Typeable a, Typeable b) => Name a -> Exp a -> Exp b -> Exp b
+subst :: (Typeable m, Typeable g, Show a, Typeable a, Typeable b) =>
+         Name a -> Exp m g a -> Exp m g b -> Exp m g b
 subst x e (EVar y) =
   case cast (x, e) of
     Just (x', e') -> if x' == y then e' else EVar y
@@ -366,32 +383,24 @@ subst x e (ECond b e1 e2) = ECond (subst x e b) (subst x e e1) (subst x e e2)
 subst _ _ e = e
 
 
--- | Interpreter types. TODO: parameterize over these somehow.
-
--- Gensym counter
-type InterpState = Int
-
-type InterpM = ReaderT Env (State InterpState)
-
-
 -- | The following is mostly just used for typechecking but is
 -- included here to avoid cyclic imports.
 
-data Type a where
-  TBool :: Type Bool
-  TFloat :: Type Double
-  TRational :: Type Rational
-  TInteger :: Type Integer
-  TDist :: (Eq a, Show a, Typeable a) => Type a -> Type (Tree a)
-  TList :: (Eq a, Show a, Typeable a) => Type a -> Type [a]
+data Type m g a where
+  TBool :: Type m g Bool
+  TFloat :: Type m g Double
+  TRational :: Type m g Rational
+  TInteger :: Type m g Integer
+  TDist :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (g a)
+  TList :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g [a]
   TPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
-           Type a -> Type b -> Type (a, b)
+           Type m g a -> Type m g b -> Type m g (a, b)
   TArrow :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
-            Type a -> Type b -> Type (a -> b)
-  TVar :: Type ()
-  TSt :: Type St
-  TExp :: (Eq a, Show a, Typeable a) => Type a -> Type (Exp a)
-deriving instance Show (Type a)
+            Type m g a -> Type m g b -> Type m g (a -> b)
+  TVar :: Type m g ()
+  TSt :: Type m g (St m g)
+  TExp :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (Exp m g a)
+deriving instance Show (Type m g a)
 
 -- instance Eq (Type a) where
 --   TBool == TBool = True
@@ -401,6 +410,47 @@ deriving instance Show (Type a)
 --   TList t1 == TList t2 = t1 == t2
 --   -- TODO: finish
 
-data SomeTypeVal where
-  SomeTypeVal :: forall a. (Eq a, Show a, Typeable a) =>
-                 Type a -> Val a -> SomeTypeVal
+data SomeTypeVal m g where
+  SomeTypeVal :: forall m g a. (Typeable m, AllF g, Eq a, Show a, Typeable a) =>
+                 Type m g a -> Val m g a -> SomeTypeVal m g
+
+
+eval_val :: Show a => Val m g a -> a
+eval_val (VRational r) = r
+eval_val (VInteger i) = i
+eval_val (VFloat f) = f
+eval_val (VBool b) = b
+eval_val VNil = []
+eval_val (VCons hd tl) = eval_val hd : eval_val tl
+eval_val (VPair x y) = (eval_val x, eval_val y)
+eval_val v = error $ "eval_val: unsupported value: " ++ show v
+
+-- List value lookup by index.
+vlist_nth :: Int -> Val m g [a] -> Val m g a
+vlist_nth _ VNil = error "vlist_nth: empty list"
+vlist_nth n (VCons hd tl)
+  | n < 0 = error "vlist_nth: negative index"
+  | n == 0 = hd
+  | otherwise = vlist_nth (n-1) tl
+
+vlist_length :: Val m g [a] -> Int
+vlist_length VNil = 0
+vlist_length (VCons _ tl) = 1 + vlist_length tl
+
+vlist_list :: Val m g [a] -> [Val m g a]
+vlist_list VNil = []
+vlist_list (VCons x xs) = x : vlist_list xs
+
+
+-- | Class of representations as defined by the type constructors 'm'
+-- and 'g', each with a set of supported primitives and a way of
+-- interpreting commands in that representation.
+class (Typeable m, AllF g) => Repr m g | g -> m where
+  primitives :: [(String, SomeTypeVal m g)]
+  interp :: (Eq a, Show a) => Env m g -> Com m g a -> g a
+
+-- Initial environment containing primitives.
+initEnv :: Repr m g => Env m g
+initEnv = (\(x, SomeTypeVal t v) ->
+             SomeNameExp (x, Proxy) (EVal v)) <$> primitives
+

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFoldable, DeriveFunctor, DeriveTraversable, TupleSections #-}
+{-# LANGUAGE StandaloneDeriving, DeriveAnyClass #-}
 
 module Tree where
 
@@ -7,6 +8,7 @@ import Data.Bifunctor
 import Data.List (nub, sort, (\\))
 import Data.Maybe (fromMaybe)
 
+import Classes
 import Datatypes
 import Sexp
 import Util

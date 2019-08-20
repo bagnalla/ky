@@ -12,7 +12,7 @@ import Util (debug)
 
 -- Compute dependencies of variables in a command (possibly a sequence
 -- of commands).
-var_deps :: Com a -> [(Id, [Id])]
+var_deps :: Com m g a -> [(Id, [Id])]
 var_deps = iter_deps . init_deps
 
 upd_deps :: Eq a => a -> ([b] -> [b]) -> [(a, [b])] -> [(a, [b])]
@@ -30,7 +30,7 @@ union_deps deps ((x, ys) : deps') =
   union_deps (upd_deps x (union ys) deps) deps'
 
 -- Initialize with direct dependencies.
-init_deps :: Com a -> [(Id, [Id])]
+init_deps :: Com m g a -> [(Id, [Id])]
 init_deps (Assign (x, _) e) = [(Id x, id_of_name <$> fvs e)]
 init_deps (Sample (x, _) e) = [(Id x, id_of_name <$> fvs e)]
 init_deps (Seq c1 c2) = union_deps (init_deps c1) (init_deps c2)
@@ -54,7 +54,7 @@ iter_deps deps =
 
 
 -- Collect variables that are directly assigned random values.
-sample_vars :: Com a -> [Id]
+sample_vars :: Com m g a -> [Id]
 sample_vars (Sample (x, _) _) = [Id x]
 sample_vars (Seq c1 c2) = union (sample_vars c1) (sample_vars c2)
 sample_vars _ = []

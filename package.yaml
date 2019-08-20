@@ -30,6 +30,7 @@ library:
   - parser-combinators
   - containers
   - random
+  - monad-loops
 
 executables:
   ky-exe:
