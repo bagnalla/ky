@@ -41,7 +41,7 @@ tree_sexp :: Show a => Tree a -> String
 tree_sexp (Leaf x) = "(" ++ show x ++ ")"
 -- tree_sexp (Leaf x) = show x
 tree_sexp (Split n t1 t2) =
-  "(" ++ fromMaybe "" (show <$> n) ++ " " ++
+  "(" ++ fromMaybe "" ((++ " ") . show <$> n) ++
   tree_sexp t1 ++ " " ++ tree_sexp t2 ++ ")"
 tree_sexp (Hole n) = "(Hole " ++ show n ++ ")"
 

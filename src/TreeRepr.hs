@@ -11,6 +11,7 @@ import           Distributions
 import           TreeInterp
 import           Lang hiding (Env, Exp, SomeVal, SomeTypeVal, Val)
 import qualified Lang as L (Env, Exp, SomeVal, SomeTypeVal(..), Val)
+import           LinEq (infer')
 import           Sample
 import           Tree
 
@@ -49,7 +50,7 @@ deriving instance AllF Tree
 
 -- Here we can provide other inference methods. (TODO: exact inference)
 instance Infer Tree where
-  infers = []
+  infers = [infer']
 
 -- Representation instance for m = InterpM and g = Tree.
 instance Repr InterpM Tree where

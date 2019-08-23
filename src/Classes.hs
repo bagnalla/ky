@@ -20,7 +20,7 @@ class Sample g where
 -- representation will have the default sampling based inference
 -- method in addition to these.
 class Infer g where
-  infers :: [g a -> a -> Float]
+  infers :: [g a -> (a -> Bool) -> Float]
 
 -- Bundle everything into a single class.
 class (EqF g, Infer g, ShowF g, Sample g, Typeable g) => AllF g where

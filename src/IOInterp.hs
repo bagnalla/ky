@@ -63,6 +63,8 @@ eval env (EBinop b e1 e2) st =
     (BLt,    VInteger i1,  VInteger i2)  -> VBool     $ i1 < i2
     (BLt,    VFloat f1,    VFloat f2)    -> VBool     $ f1 < f2
 
+eval env (EPair e1 e2) st = VPair (eval env e1 st) (eval env e2 st)
+
 eval _ ENil _ = VNil
 
 eval env (ECons hd tl) st = VCons (eval env hd st) (eval env tl st)

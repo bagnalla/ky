@@ -58,22 +58,24 @@ id_of_name (SomeName (x, _)) = Id x
 
 data Val (m :: * -> *) (g :: * -> *) (a :: *) where
   VRational :: Rational -> Val m g Rational
-  VInteger :: Integer -> Val m g Integer
-  VFloat :: Double -> Val m g Double
-  VBool :: Bool -> Val m g Bool
-  VDist :: (Eq a, Show a) => g (Exp m g a) -> Val m g (g a)
-  VNil :: (Eq a, Show a) => Val m g [a]
-  VCons :: (Eq a, Show a, Typeable a) =>
-           Val m g a -> Val m g [a] -> Val m g [a]
-  VPair :: (Eq a, Show a, Eq b, Show b) =>
-           Val m g a -> Val m g b -> Val m g (a, b)
-  VLam :: (Show a, Typeable a, Eq b, Show b) =>
-          Name a -> Exp m g b -> Val m g (a -> b)
-  VPrim :: (Show a, Typeable a) =>
-           (Val m g a -> m (Exp m g b)) -> Val m g (a -> b)
+  VInteger  :: Integer -> Val m g Integer
+  VFloat    :: Double -> Val m g Double
+  VBool     :: Bool -> Val m g Bool
+  VDist     :: (Eq a, Show a) => g (Exp m g a) -> Val m g (g a)
+  VNil      :: (Eq a, Show a) => Val m g [a]
+  VCons     :: (Eq a, Show a, Typeable a) =>
+               Val m g a -> Val m g [a] -> Val m g [a]
+  VPair     :: (Eq a, Show a, Eq b, Show b) =>
+               Val m g a -> Val m g b -> Val m g (a, b)
+  VLam      :: (Show a, Typeable a, Eq b, Show b) =>
+               Name a -> Exp m g b -> Val m g (a -> b)
+  VPrim     :: (Show a, Typeable a) =>
+               (Val m g a -> m (Exp m g b)) -> Val m g (a -> b)
   -- Experimental/unused. Polymorphic primitives.
   -- VPrim' :: (Show c, Typeable c) =>
   --           (forall a b. Val m g a -> m (Exp m g b)) -> Val m g (c -> d)
+
+-- deriving instance Typeable Val
 
 data SomeVal m g where
   SomeVal :: forall m g a. (Show a, Typeable a) => Val m g a -> SomeVal m g
@@ -107,7 +109,7 @@ instance Show a => Show (Val m g a) where
   -- show (VList l) = "VList " ++ show l
   show VNil = "VNil"
   show (VCons hd tl) = "VCons " ++ show hd ++ " " ++ show tl
-  show (VPair x y) = "VPair " ++ show x ++ " " ++ show y
+  show (VPair x y) = "VPair {" ++ show x ++ ", " ++ show y ++ "}"
   show (VLam x e) = "VLam " ++ show x ++ " " ++ show e
   show (VPrim f) = "VPrim " ++ show f
 
@@ -191,51 +193,56 @@ data BinopTy =
   | BTLt
 
 data Binop a where
-  BPlus :: Binop BTPlus
+  BPlus  :: Binop BTPlus
   BMinus :: Binop BTMinus
-  BMult :: Binop BTMult
-  BAnd :: Binop BTAnd
-  BOr :: Binop BTOr
-  BEq :: Binop BTEq
-  BLt :: Binop BTLt
+  BMult  :: Binop BTMult
+  BAnd   :: Binop BTAnd
+  BOr    :: Binop BTOr
+  BEq    :: Binop BTEq
+  BLt    :: Binop BTLt
 deriving instance Eq (Binop a)
 deriving instance Show (Binop a)
 
 type family BinopResTy (a :: BinopTy) (b :: *) (c :: *) where
-  BinopResTy BTPlus  Double Double = Double
-  BinopResTy BTMinus Double Double = Double
-  BinopResTy BTMult  Double Double = Double
+  BinopResTy BTPlus  Double   Double   = Double
+  BinopResTy BTMinus Double   Double   = Double
+  BinopResTy BTMult  Double   Double   = Double
   BinopResTy BTPlus  Rational Rational = Rational
   BinopResTy BTMinus Rational Rational = Rational
   BinopResTy BTMult  Rational Rational = Rational
-  BinopResTy BTPlus Integer Integer = Integer
-  BinopResTy BTMinus Integer Integer = Integer
-  BinopResTy BTMult Integer Integer = Integer
-  BinopResTy BTAnd Bool Bool = Bool
-  BinopResTy BTOr Bool Bool = Bool
-  BinopResTy BTEq t t = Bool
-  BinopResTy BTLt t t = Bool
+  BinopResTy BTPlus  Integer  Integer  = Integer
+  BinopResTy BTMinus Integer  Integer  = Integer
+  BinopResTy BTMult  Integer  Integer  = Integer
+  BinopResTy BTAnd   Bool     Bool     = Bool
+  BinopResTy BTOr    Bool     Bool     = Bool
+  BinopResTy BTEq    t        t        = Bool
+  BinopResTy BTLt    t        t        = Bool
 
 data Exp (m :: * -> *) (g :: * -> *) (a :: *) where
-  EVal :: Val m g a -> Exp m g a
-  EVar :: Name a -> Exp m g a
-  EUnop :: (Typeable m, Typeable g, Typeable a, Show b, Typeable b) =>
-           Unop a -> Exp m g b -> Exp m g (UnopResTy a b)
-  EBinop :: (Typeable m, Typeable g, Typeable a, Eq b, Show b, Typeable b) =>
-            Binop a -> Exp m g b -> Exp m g b -> Exp m g (BinopResTy a b b)
-  EPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
-           Exp m g a -> Exp m g b -> Exp m g (a, b)
-  ENil :: (Eq a, Show a, Typeable a) => Exp m g [a]
-  ECons :: (Eq a, Show a, Typeable a) => Exp m g a -> Exp m g [a] -> Exp m g [a]
+  EVal      :: Val m g a -> Exp m g a
+  EVar      :: Name a -> Exp m g a
+  EUnop     :: (Typeable m, Typeable g, Typeable a, Show b, Typeable b) =>
+               Unop a -> Exp m g b -> Exp m g (UnopResTy a b)
+  EBinop    :: (Typeable m, Typeable g, Typeable a, Eq b, Show b, Typeable b) =>
+               Binop a -> Exp m g b -> Exp m g b -> Exp m g (BinopResTy a b b)
+  EPair     :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
+               Exp m g a -> Exp m g b -> Exp m g (a, b)
+  ENil      :: (Eq a, Show a, Typeable a) => Exp m g [a]
+  ECons     :: (Eq a, Show a, Typeable a) =>
+               Exp m g a -> Exp m g [a] -> Exp m g [a]
   EDestruct :: (Show a, Typeable a, Show b) =>
                Exp m g [a] -> Exp m g b -> Exp m g (a -> [a] -> b) -> Exp m g b
-  EUniform :: (Eq a, Show a, Typeable a) => Exp m g [a] -> Exp m g (g a)
-  ELam :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
-          Name a -> Exp m g b -> Exp m g (a -> b)
-  EApp :: (Show a, Typeable a, Show b) => Exp m g (a -> b) -> Exp m g a -> Exp m g b
-  ECom :: (Eq a, Show a) => [SomeNameExp m g] -> Com m g (Exp m g a) -> Exp m g (g a)
-  ECond :: (Show a, Typeable a) => Exp m g Bool -> Exp m g a -> Exp m g a -> Exp m g a
-  EPrim :: (Show a, Typeable a) => (Val m g a -> m (Exp m g b)) -> Exp m g (a -> b)
+  EUniform  :: (Eq a, Show a, Typeable a) => Exp m g [a] -> Exp m g (g a)
+  ELam      :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
+               Name a -> Exp m g b -> Exp m g (a -> b)
+  EApp      :: (Show a, Typeable a, Show b) =>
+               Exp m g (a -> b) -> Exp m g a -> Exp m g b
+  ECom      :: (Eq a, Show a) =>
+               [SomeNameExp m g] -> Com m g (Exp m g a) -> Exp m g (g a)
+  ECond     :: (Show a, Typeable a) =>
+               Exp m g Bool -> Exp m g a -> Exp m g a -> Exp m g a
+  EPrim     :: (Show a, Typeable a) =>
+               (Val m g a -> m (Exp m g b)) -> Exp m g (a -> b)
 
 data SomeExp m g where
   SomeExp :: forall m g a. (Show a, Typeable a) => Exp m g a -> SomeExp m g
@@ -283,18 +290,18 @@ instance Show a => Show (Exp m g a) where
 
 
 data Com (m :: * -> *) (g :: * -> *) (a :: *) where
-  Skip :: Com m g (St m g)
-  Assign :: (Typeable m, Typeable g, Show a, Typeable a) =>
-            Name a -> Exp m g a -> Com m g (St m g)
-  Seq :: Com m g (St m g) -> Com m g a -> Com m g a
-  Ite :: Exp m g Bool -> Com m g a -> Com m g a -> Com m g a
-  Sample :: (Typeable m, Typeable g, Show (g a), Show a, Typeable a) =>
-            Name a -> Exp m g (g a) -> Com m g (St m g)
+  Skip    :: Com m g (St m g)
+  Assign  :: (Typeable m, Typeable g, Show a, Typeable a) =>
+             Name a -> Exp m g a -> Com m g (St m g)
+  Seq     :: Com m g (St m g) -> Com m g a -> Com m g a
+  Ite     :: Exp m g Bool -> Com m g a -> Com m g a -> Com m g a
+  Sample  :: (Typeable m, Typeable g, Show (g a), Show a, Typeable a) =>
+             Name a -> Exp m g (g a) -> Com m g (St m g)
   Observe :: Exp m g Bool -> Com m g (St m g)
-  Return :: (Show a, Typeable a) => Exp m g a -> Com m g (Exp m g a)
-  While :: Exp m g Bool -> Com m g (St m g) -> Com m g (St m g)
+  Return  :: (Show a, Typeable a) => Exp m g a -> Com m g (Exp m g a)
+  While   :: Exp m g Bool -> Com m g (St m g) -> Com m g (St m g)
   -- Derived commands:
-  Abort :: Com m g (St m g)
+  Abort   :: Com m g (St m g)
 
 instance Eq (Com m g a) where
   Skip == Skip = True
@@ -387,19 +394,19 @@ subst _ _ e = e
 -- included here to avoid cyclic imports.
 
 data Type m g a where
-  TBool :: Type m g Bool
-  TFloat :: Type m g Double
+  TBool     :: Type m g Bool
+  TFloat    :: Type m g Double
   TRational :: Type m g Rational
-  TInteger :: Type m g Integer
-  TDist :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (g a)
-  TList :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g [a]
-  TPair :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
-           Type m g a -> Type m g b -> Type m g (a, b)
-  TArrow :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
-            Type m g a -> Type m g b -> Type m g (a -> b)
-  TVar :: Type m g ()
-  TSt :: Type m g (St m g)
-  TExp :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (Exp m g a)
+  TInteger  :: Type m g Integer
+  TDist     :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (g a)
+  TList     :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g [a]
+  TPair     :: (Eq a, Show a, Typeable a, Eq b, Show b, Typeable b) =>
+               Type m g a -> Type m g b -> Type m g (a, b)
+  TArrow    :: (Show a, Typeable a, Eq b, Show b, Typeable b) =>
+               Type m g a -> Type m g b -> Type m g (a -> b)
+  TVar      :: Type m g ()
+  TSt       :: Type m g (St m g)
+  TExp      :: (Eq a, Show a, Typeable a) => Type m g a -> Type m g (Exp m g a)
 deriving instance Show (Type m g a)
 
 -- instance Eq (Type a) where
@@ -442,6 +449,7 @@ vlist_list VNil = []
 vlist_list (VCons x xs) = x : vlist_list xs
 
 
+------------------------------------------------------------------------
 -- | Class of representations as defined by the type constructors 'm'
 -- and 'g', each with a set of supported primitives and a way of
 -- interpreting commands in that representation.
@@ -453,4 +461,3 @@ class (Typeable m, AllF g) => Repr m g | g -> m where
 initEnv :: Repr m g => Env m g
 initEnv = (\(x, SomeTypeVal t v) ->
              SomeNameExp (x, Proxy) (EVal v)) <$> primitives
-

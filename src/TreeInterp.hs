@@ -150,6 +150,8 @@ eval (EBinop b e1 e2) st = do
         (VBool b1, VBool b2) -> return $ VBool $ b1 < b2
         _ -> error "eval: ill-typed BLt expression"
 
+eval (EPair e1 e2) st = pure VPair <*> eval e1 st <*> eval e2 st
+
 eval ENil _ = return VNil
 
 eval (ECons hd tl) st = do
@@ -221,15 +223,21 @@ interp (Sample x e) t = do
 
 interp (Seq c1 c2) t = interp' c1 t >>= interp' c2
 
+-- interp (Ite e c1 c2) t =
+--   mapJoin t $ \st -> do
+--     fresh_lbl1 <- freshLbl
+--     fresh_lbl2 <- freshLbl
+--     b <- is_true e st
+--     if b then
+--       set_label fresh_lbl1 <$> (interp' c1 $ Leaf st)
+--       else
+--       set_label fresh_lbl2 <$> (interp' c2 $ Leaf st)
+
 interp (Ite e c1 c2) t =
   mapJoin t $ \st -> do
-    fresh_lbl1 <- freshLbl
-    fresh_lbl2 <- freshLbl
     b <- is_true e st
-    if b then
-      set_label fresh_lbl1 <$> (interp' c1 $ Leaf st)
-      else
-      set_label fresh_lbl2 <$> (interp' c2 $ Leaf st)
+    if b then interp' c1 $ Leaf st
+      else interp' c2 $ Leaf st
 
 interp (While e c) t =
   let deps = var_deps c
