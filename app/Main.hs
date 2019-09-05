@@ -69,9 +69,9 @@ main = do
           -- let model = z3infer tb
           -- putStrLn $ show model
 
-          -- let tb = (\(EVal (VBool b)) -> b) <$> t
-          -- v <- solve_tree tb
-          -- putStrLn $ show v
+          let tb = (\(EVal (VBool b)) -> b) <$> t
+          v <- solve_tree tb
+          putStrLn $ show v
           
         _ ->
           putStrLn "expected bool tree"
