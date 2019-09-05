@@ -75,23 +75,26 @@ equations_of_ltree (LSplit x t1 t2) =
   (equations_of_ltree t1) ++ (equations_of_ltree t2)
 equations_of_ltree _ = []
 
--- -- Look for a term containing a given variable in a set of
--- -- terms. Return the coefficient of the first one encountered.
--- lookup_term :: Var -> [Term] -> Maybe Coeff
--- lookup_term x ((c, Just y) : terms) =
---   if x == y then Just c else lookup_term x terms
--- lookup_term x (_ : terms) = lookup_term x terms
--- lookup_term _ [] = Nothing
+-- Look for a term containing a given variable in a set of
+-- terms. Return the coefficient of the first one encountered.
+lookup_term :: Maybe Var -> [Term] -> Maybe Coeff
+lookup_term (Just x) ((c, Just y) : terms) =
+  if x == y then Just c else lookup_term (Just x) terms
+lookup_term Nothing ((c, Nothing) : terms) = Just c
+lookup_term x (_ : terms) = lookup_term x terms
+lookup_term _ [] = Nothing
 
 -- Look for a term containing a given variable in a set of
 -- terms. Return the coefficient of the first one encountered, and the
 -- list of terms with the selected one deleted.
-lookup_term :: Var -> [Term] -> Maybe (Coeff, [Term])
-lookup_term = go []
+remove_term :: Maybe Var -> [Term] -> Maybe (Coeff, [Term])
+remove_term = go []
   where
-    go :: [Term] -> Var -> [Term] -> Maybe (Coeff, [Term])
-    go acc x (tm@(c, Just y) : terms) =
-      if x == y then Just (c, acc ++ terms) else go (tm:acc) x terms
+    go :: [Term] -> Maybe Var -> [Term] -> Maybe (Coeff, [Term])
+    go acc (Just x) (tm@(c, Just y) : terms) =
+      if x == y then Just (c, acc ++ terms)
+      else go (tm:acc) (Just x) terms
+    go acc Nothing (tm@(c, Nothing) : terms) = Just (c, acc ++ terms)
     go acc x (tm : terms) = go (tm:acc) x terms
     go _ _ [] = Nothing
 
@@ -103,10 +106,18 @@ mult_term r (c, x) = (r*c, x)
 -- necessary but could improve efficiency).
 simplify_equation :: Equation -> Equation
 simplify_equation (Equation (x, terms)) =
-  case lookup_term x terms of
+  case remove_term (Just x) terms of
     Nothing -> Equation (x, terms)
     Just (c, terms') ->
       simplify_equation $ Equation (x, mult_term (recip (1-c)) <$> terms')
+
+-- Use remove_term and recurse until fixed point.
+combine_terms :: [Term] -> [Term]
+combine_terms ((a, x) : tms) =
+  case remove_term x tms of
+    Just (b, tms') -> combine_terms $ (a+b, x) : tms'
+    Nothing -> (a, x) : combine_terms tms
+combine_terms [] = []
 
 subst_var :: Var -> [Term] -> Term -> [Term]
 subst_var _ _ (c, Nothing) = [(c, Nothing)]

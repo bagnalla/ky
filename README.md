@@ -1,5 +1,8 @@
 # ky
 
+To use Z3 (disabled at the moment), build and install this version of
+Z3: https://github.com/Z3Prover/z3/tree/z3-4.8.1
+
 ##### stack build && stack exec ky-exe programs/test1.ky
 
 #### app/

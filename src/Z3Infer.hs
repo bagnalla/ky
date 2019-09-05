@@ -1,0 +1,121 @@
+module Z3Infer where
+
+-- import           Control.Monad
+-- import           Data.List (sort)
+-- import           Data.Ratio (numerator, denominator)
+-- import           System.IO.Unsafe (unsafePerformIO)
+-- import           Z3.Monad (AST, Z3, MonadZ3, (+?), Model, Result(..),
+--                            solverCheck, solverGetModel, solverCheckAndGetModel)
+-- import qualified Z3.Monad as Z3
+
+-- import LinEq
+-- import Tree
+-- import Util (debug)
+
+-- type Z3Var = AST
+-- type Binding = (Var, Z3Var)
+-- type Context = [Binding]
+
+-- mk_ctx :: [Equation] -> Z3 Context
+-- mk_ctx = mapM $ \(Equation (x, _)) -> do
+--   var <- Z3.mkFreshRealVar $ show x
+--   -- var_string <- Z3.astToString var
+--   -- debug ("var: " ++ var_string) $
+--   return (x, var)
+
+-- equation_constraint :: Context -> Equation -> Z3 AST
+-- equation_constraint ctx (Equation (x, tms)) =
+--   case lookup x ctx of
+--     Just x' -> do
+--       tms' <- mapM (\(c, y) -> do
+--                        c' <- Z3.mkReal (fromIntegral $ numerator c)
+--                              (fromIntegral $ denominator c)
+--                        case y of
+--                          Just y' ->
+--                            case lookup y' ctx of
+--                              Just y'' -> Z3.mkMul [c', y'']
+--                              Nothing ->
+--                                error "equation_constraint: unbound variable"
+--                          Nothing ->
+--                            return c') tms
+--       sum <- Z3.mkAdd tms'
+--       Z3.mkEq x' sum
+--     Nothing -> error "equation_constraint: unbound variable"
+
+-- print_ctx :: Context -> Z3 ()
+-- print_ctx ctx =
+--   debug "print_ctx" $
+--   forM_ ctx $ \(x, v) -> do
+--   v_str <- Z3.astToString v
+--   debug (show x ++ ": " ++ v_str) $ return ()
+
+-- -- solve :: [Equation] -> Z3 (Result, Maybe Model)
+-- solve :: [Equation] -> Z3 (Result, Maybe [Z3.FuncDecl])
+-- solve eqs =
+--   debug "solve" $
+--   debug ("eqs: " ++ (show $ sort eqs)) $ do
+--   ctx <- mk_ctx $ sort eqs
+--   print_ctx ctx
+--   -- mapM_ (equation_constraint ctx >=> Z3.assert) eqs
+--   forM_ (sort eqs) $ \eq -> do
+--     constraint <- equation_constraint ctx eq
+--     constraint_str <- Z3.astToString constraint
+--     debug ("constraint: " ++ constraint_str) $
+--       Z3.assert constraint
+--       -- Z3.solverAssertCnstr constraint
+--   -- res <- solverCheck
+--   -- debug ("ctx: " ++ show ctx) $
+--   --   debug ("res: " ++ show res) $
+--   --   case res of
+--   --     Sat -> do
+--   --       -- model <- solverGetModel
+--   --       -- funcs <- Z3.getFuncs model
+--   --       -- debug ("bakow") $
+--   --       --   seq model $
+--   --       --   debug ("funcs: " ++ show funcs) $
+--   --         -- return (Sat, Just funcs)
+--   --       return (Sat, Just [])
+--   --     _ ->
+--   --       return (res, Nothing)
+--   (res, model) <- solverCheckAndGetModel
+--   -- debug ("res: " ++ show res) $
+--   case model of
+--     Just model' -> do
+--       -- debug "model exists" $ do
+--       num_consts <- Z3.numConsts model'
+--       num_funcs <- Z3.numFuncs model'
+--       model_string <- Z3.modelToString model'
+--         -- debug ("ctx: " ++ show ctx) $
+--         -- debug ("num_consts: " ++ show num_consts) $
+--         --   debug ("num_funcs: " ++ show num_funcs) $
+--       debug ("model: " ++ model_string) $ do
+--         funcs <- Z3.getConsts model'
+--         return (res, Just funcs)
+--     Nothing ->
+--       return (res, Nothing)
+
+-- -- z3infer :: Tree a -> (a -> Bool) -> Float
+-- -- z3infer t f =
+-- --   case unsafePerformIO $ Z3.evalZ3 $ solve $
+-- --        equations_of_ltree $ ltree_of_tree $ f <$> t of
+-- --     (Unsat, _) -> error "z3infer: unsat"
+-- --     (_, Just model) -> undefined
+
+-- z3infer :: Tree Bool -> [Z3.FuncDecl]
+-- z3infer t =
+--   case unsafePerformIO $ Z3.evalZ3 $ solve $
+--        equations_of_ltree $ ltree_of_tree t of
+--     (Unsat, _) -> error "z3infer: unsat"
+--     (_, Just model) -> model
+
+-- -- z3infer :: Tree Bool -> [Z3.FuncDecl]
+-- -- z3infer t =
+-- --   let lt = ltree_of_tree t
+-- --       eqs = equations_of_ltree lt
+-- --       z3 = solve eqs
+-- --       io = Z3.evalZ3 z3
+-- --       res = unsafePerformIO io in
+-- --     debug ("z3: " ++ show z3) $
+-- --     case res of
+-- --       (Unsat, _) -> error "z3infer: unsat"
+-- --       (_, Just model) -> model

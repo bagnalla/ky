@@ -281,13 +281,24 @@ path_labels _ _ = []
 --     isSubsetOf t2_holes t1_labels
 --     -- && False
 
+-- compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
+-- compatible_for_swap t p1 p2 =
+--   let t1 = get_subtree p1 t
+--       t2 = get_subtree p2 t
+--       t1_labels = path_labels p1 t
+--       t2_labels = path_labels p2 t in
+--     t1 == t2 && setEq t1_labels t2_labels
+
 compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
 compatible_for_swap t p1 p2 =
   let t1 = get_subtree p1 t
       t2 = get_subtree p2 t
       t1_labels = path_labels p1 t
       t2_labels = path_labels p2 t in
-    t1 == t2 && setEq t1_labels t2_labels
+    setEq t1_labels t2_labels
+
+-- compatible_for_swap :: Eq a => Tree a -> Path -> Path -> Bool
+-- compatible_for_swap _ _ _ = True
 
 -- If there are two duplicate leaves at the same level, group them
 -- together as siblings. Doesn't necessarily group all such duplicates

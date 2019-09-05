@@ -3,6 +3,7 @@
 # https://arxiv.org/abs/1804.04052 section 2.2.
 
 main:
+
   p <- 1/3 # This could be anything in (0, 1)
   x <- false
   y <- false

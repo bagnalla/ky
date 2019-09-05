@@ -2,9 +2,11 @@
 
 module Main where
 
-import Data.Proxy
-import Data.Typeable
-import System.Environment (getArgs)
+import           Data.Proxy
+import           Data.Typeable
+import           System.Environment (getArgs)
+-- import qualified Z3.Base
+-- import qualified Z3.Monad as Z3
 
 import Classes
 import Inference
@@ -12,8 +14,10 @@ import IORepr
 import Lang (Exp(..), Type(..), Val(..), primitives, initEnv, interp)
 import TreeRepr
 import Sexp
+import SparseLinAlg (solve_tree)
 import Tree
 import Tycheck (SomeG(..), load_repr)
+-- import Z3Infer (z3infer)
 
 main :: IO ()
 main = do
@@ -48,18 +52,27 @@ main = do
       putStrLn $ toSexp $ reorder t
       putStrLn $ "size: " ++ (show $ tree_size t)
 
-      putStrLn "TREE SAMPLING INFERENCE:"
-      finite_pmf <- sample_infer t n
-      putStrLn $ show finite_pmf
+      -- putStrLn "TREE SAMPLING INFERENCE:"
+      -- finite_pmf <- sample_infer t n
+      -- putStrLn $ show finite_pmf
 
-      let t' = canon t
-      putStrLn "REDUCED TREE:"
-      putStrLn $ toSexp t'
-      putStrLn $ "size: " ++ (show $ tree_size t')
+      -- let t' = canon t
+      -- putStrLn "REDUCED TREE:"
+      -- putStrLn $ toSexp t'
+      -- putStrLn $ "size: " ++ (show $ tree_size t')
 
       case ty of
-        TExp TBool ->
-          putStrLn $ show $ (infers!!0) t' (\(EVal (VBool b)) -> b)
+        TExp TBool -> do
+          putStrLn $ show $ (infers!!0) t (\(EVal (VBool b)) -> b)
+          -- putStrLn $ show $ (infers!!0) t' (\(EVal (VBool b)) -> b)
+          -- let tb = (\(EVal (VBool b)) -> b) <$> t
+          -- let model = z3infer tb
+          -- putStrLn $ show model
+
+          -- let tb = (\(EVal (VBool b)) -> b) <$> t
+          -- v <- solve_tree tb
+          -- putStrLn $ show v
+          
         _ ->
           putStrLn "expected bool tree"
 

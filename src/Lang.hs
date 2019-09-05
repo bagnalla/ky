@@ -270,23 +270,41 @@ instance Eq (Exp m g a) where
   -- TODO finish
   _ == _ = False
 
+-- instance Show a => Show (Exp m g a) where
+--   show (EVal v) = "(EVal " ++ show v ++ ")"
+--   show (EVar x) = "(EVar " ++ show x ++ ")"
+--   show (EUnop u e) = "(EUnop " ++ show u ++ " " ++ show e ++ ")"
+--   show (EBinop b e1 e2) =
+--     "(EBinop " ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
+--   show ENil = "ENil"
+--   show (ECons e1 e2) = "(ECons " ++ show e1 ++ " " ++ show e2 ++ ")"
+--   show (EDestruct l z f) = -- "(EDestruct " ++ show l ++ " " ++ show z ++ ")"
+--     "(EDestruct " ++ show l ++ " " ++ show z ++ " " ++ show f ++ ")"
+--   show (ELam x e) = "(ELam " ++ show x ++ " " ++ show e ++ ")"
+--   show (EApp e1 e2) = "(EApp " ++ show e1 ++ " " ++ show e2 ++ ")"
+--   show (ECom _ c) = "(ECom " ++ show c ++ ")"
+--   show (ECond b e1 e2) =
+--     "(ECond " ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
+--   show (EPrim f) = "EPrim"
+--   show (EUniform l) = "(EUniform " ++ show l ++ ")"
+
 instance Show a => Show (Exp m g a) where
-  show (EVal v) = "(EVal " ++ show v ++ ")"
-  show (EVar x) = "(EVar " ++ show x ++ ")"
-  show (EUnop u e) = "(EUnop " ++ show u ++ " " ++ show e ++ ")"
+  show (EVal v) = "EVal " ++ show v
+  show (EVar x) = "EVar " ++ show x
+  show (EUnop u e) = "EUnop " ++ show u ++ " " ++ show e
   show (EBinop b e1 e2) =
-    "(EBinop " ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
+    "EBinop " ++ show b ++ " " ++ show e1 ++ " " ++ show e2
   show ENil = "ENil"
-  show (ECons e1 e2) = "(ECons " ++ show e1 ++ " " ++ show e2 ++ ")"
+  show (ECons e1 e2) = "ECons " ++ show e1 ++ " " ++ show e2
   show (EDestruct l z f) = -- "(EDestruct " ++ show l ++ " " ++ show z ++ ")"
-    "(EDestruct " ++ show l ++ " " ++ show z ++ " " ++ show f ++ ")"
-  show (ELam x e) = "(ELam " ++ show x ++ " " ++ show e ++ ")"
-  show (EApp e1 e2) = "(EApp " ++ show e1 ++ " " ++ show e2 ++ ")"
-  show (ECom _ c) = "(ECom " ++ show c ++ ")"
+    "EDestruct " ++ show l ++ " " ++ show z ++ " " ++ show f
+  show (ELam x e) = "ELam " ++ show x ++ " " ++ show e
+  show (EApp e1 e2) = "EApp " ++ show e1 ++ " " ++ show e2
+  show (ECom _ c) = "ECom " ++ show c
   show (ECond b e1 e2) =
-    "(ECond " ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
+    "ECond " ++ show b ++ " " ++ show e1 ++ " " ++ show e2
   show (EPrim f) = "EPrim"
-  show (EUniform l) = "(EUniform " ++ show l ++ ")"
+  show (EUniform l) = "EUniform " ++ show l
 
 
 data Com (m :: * -> *) (g :: * -> *) (a :: *) where
