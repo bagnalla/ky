@@ -187,6 +187,7 @@ data BinopTy =
   BTPlus
   | BTMinus
   | BTMult
+  | BTDiv
   | BTAnd
   | BTOr
   | BTEq
@@ -196,6 +197,7 @@ data Binop a where
   BPlus  :: Binop BTPlus
   BMinus :: Binop BTMinus
   BMult  :: Binop BTMult
+  BDiv   :: Binop BTDiv
   BAnd   :: Binop BTAnd
   BOr    :: Binop BTOr
   BEq    :: Binop BTEq
@@ -207,9 +209,11 @@ type family BinopResTy (a :: BinopTy) (b :: *) (c :: *) where
   BinopResTy BTPlus  Double   Double   = Double
   BinopResTy BTMinus Double   Double   = Double
   BinopResTy BTMult  Double   Double   = Double
+  BinopResTy BTDiv   Double Double     = Double
   BinopResTy BTPlus  Rational Rational = Rational
   BinopResTy BTMinus Rational Rational = Rational
   BinopResTy BTMult  Rational Rational = Rational
+  BinopResTy BTDiv   Rational Rational = Rational
   BinopResTy BTPlus  Integer  Integer  = Integer
   BinopResTy BTMinus Integer  Integer  = Integer
   BinopResTy BTMult  Integer  Integer  = Integer

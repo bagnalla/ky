@@ -13,6 +13,7 @@ data Binop =
   BPlus
   | BMinus
   | BMult
+  | BDiv
   | BAnd
   | BOr
   | BEq

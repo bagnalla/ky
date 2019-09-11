@@ -190,6 +190,13 @@ tycheckExp p (U.EBinop pos binop e1 e2) = do
         _ -> typeError pos $
              "expected TFloat for both sides, got "
              ++ show t1 ++ " and " ++ show t2
+    U.BDiv ->
+      case (t1, t2) of
+        (TFloat, TFloat) ->
+          return $ SomeExp TFloat $ L.EBinop L.BDiv e1' e2'
+        _ -> typeError pos $
+             "expected TFloat for both sides, got "
+             ++ show t1 ++ " and " ++ show t2
     U.BAnd ->
       case (t1, t2) of
         (TBool, TBool) ->

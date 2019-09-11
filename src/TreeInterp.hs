@@ -133,6 +133,11 @@ eval (EBinop b e1 e2) st = do
         (VFloat f1, VFloat f2) -> return $ VFloat $ f1 * f2
         (VInteger i1, VInteger i2) -> return $ VInteger $ i1 * i2
         _ -> error "eval: ill-typed BMult expression"
+    BDiv ->
+      case (v1, v2) of
+        (VRational r1, VRational r2) -> return $ VRational $ r1 / r2
+        (VFloat f1, VFloat f2) -> return $ VFloat $ f1 / f2
+        _ -> error "eval: ill-typed BDiv expression"
     BAnd ->
       case (v1, v2) of
         (VBool b1, VBool b2) -> return $ VBool $ b1 && b2

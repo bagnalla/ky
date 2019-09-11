@@ -198,7 +198,8 @@ op n ms =
 
 operatorTable :: [[Operator Parser (Exp SourcePos)]]
 operatorTable =
-  [ [ binary "*" $ flip EBinop BMult ],
+  [ [ binary "*" $ flip EBinop BMult,
+      binary "/" $ flip EBinop BDiv ],
     [ binary "+" $ flip EBinop BPlus
     , binary "-" $ flip EBinop BMinus ],
     [ binary "=" $ flip EBinop BEq
