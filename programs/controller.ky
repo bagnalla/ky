@@ -1,0 +1,47 @@
+# A PI controller
+
+func head(l : [float]) -> float:
+  destruct(l, 0.0, \x:float. \xs:[float]. x)
+
+func tail(l : [float]) -> [float]:
+  destruct(l, []:[float], \x:float. \xs:[float]. xs)
+
+func sum(l : [float]) -> float:
+  destruct(l, 0.0, \x:float. \xs:[float]. x + sum(xs))
+
+func len(l : [float]) -> float:
+  destruct(l, 0.0, \x:float. \xs:[float]. 1.0 + len(xs))
+
+func map (f : float->float, l : [float]) -> [float] :
+  destruct (l, []:[float], \x:float. \xs:[float]. f(x) :: map(f, xs))  
+
+# A PI controller. vr is the setpoint velocity.
+# Assumes len(vs) > 0  
+func pi(vr: float, k: float, vs: [float]) -> float:
+  k*((vr - head(vs)) + sum(map(\v:float. vr - v, vs))/len(vs))
+
+# dv/dt in response to control signal u \in [0,1].
+# theta is the road angle.
+func plant(theta: float, u: float) -> float:
+  u - theta
+
+main:
+  vr <- 0.5
+  theta <- 0.1
+  
+  k  <~ uniform([0.1,0.5,0.9]:[float])
+
+  i  <- 0
+  v  <- 0.0
+  vs <- [v]:[float]
+  while i < 5:
+    u  <- pi(vr, k, vs)
+    dv <- plant(theta, u)
+    new_v <- dv + v
+    #observe (new_v - v < 0.5)
+    #observe (vr - new_v < 0.5)
+    #observe (k = 0.5)
+    v <- new_v
+    vs <- new_v :: vs
+    i <- i + 1
+  r <- vr - v
