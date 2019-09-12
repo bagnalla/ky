@@ -72,7 +72,6 @@ main = do
           let tb = (\(EVal (VBool b)) -> b) <$> t
           v <- solve_tree tb
           putStrLn $ show v
-          
         _ ->
           putStrLn "expected bool tree"
 

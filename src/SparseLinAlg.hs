@@ -1,6 +1,7 @@
 module SparseLinAlg (solve_tree) where
 
-import Data.Bifunctor (second)
+import Data.Bifunctor (bimap, second)
+import Data.List (sort)
 import Data.Maybe (fromJust)
 import Data.Sparse.SpMatrix
 import Data.Sparse.SpVector
@@ -8,6 +9,7 @@ import Numeric.LinearAlgebra.Sparse
 import System.IO.Unsafe (unsafePerformIO)
 
 import LinEq
+import Sexp
 import Tree
 import Util (debug, tupleFun)
 
@@ -17,14 +19,23 @@ import Util (debug, tupleFun)
 type MatTerm = (Coeff, Var)
 type MatEq = ([MatTerm], Rational)
 
+-- mateq_of_equation :: Equation -> MatEq
+-- mateq_of_equation (Equation (x, tms)) =
+--   case remove_term Nothing $ combine_terms tms of
+--     Just (c, tms') -> (second fromJust <$> tms', c)
+--     Nothing -> (second fromJust <$> tms, 0)
+
 mateq_of_equation :: Equation -> MatEq
 mateq_of_equation (Equation (x, tms)) =
   case remove_term Nothing $ combine_terms tms of
-    Just (c, tms') -> (second fromJust <$> tms', c)
-    Nothing -> (second fromJust <$> tms, 0)
+    Just (c, tms') -> ((1, x) : (bimap negate fromJust <$> tms'), c)
+    Nothing -> ((1, x) : (bimap negate fromJust <$> tms), 0)
 
 constraint_matrix :: [MatEq] -> SpMatrix Rational
-constraint_matrix eqs = fromListSM (n, n) $ concat $ f <$> zip [0..] eqs
+constraint_matrix eqs =
+  let l = concat $ f <$> zip [0..] eqs in
+    debug ("l: " ++ show ((\(x, y, z) -> (x, y, fromRational z)) <$> l)) $
+    fromListSM (n, n) l
   where
     n = length eqs
 
@@ -63,23 +74,37 @@ solve_system_gmres mat rhs =
   debug ("mat: " ++ show mat) $
   debug ("rhs: " ++ show rhs) $
   debug ("dense:") $
-  let _ = unsafePerformIO $ prd mat in
+  -- let _ = unsafePerformIO $ prd mat in
   -- mat <\> (fromListDenseSV n )
-    mat <\> rhs
+  mat <\> rhs
   where
     n = nrows mat -- should also be the length of the rhs vector
 
 solve_tree :: Tree Bool -> IO (SpVector Double)
 -- solve_tree = solve_system_gmres . tree_constraint_matrix
 solve_tree t =
-  let eqs = equations_of_ltree $ ltree_of_tree t
+  let lt = ltree_of_tree t
+      eqs = sort $ equations_of_ltree lt
       mateqs = mateq_of_equation <$> eqs
       -- (mat, rhs) = (matrix_of_mateqs mateqs, rhs_of_mateqs mateqs)
       (mat, rhs) = tupleFun matrix_of_mateqs rhs_of_mateqs mateqs in
+    debug ("eqs: " ++ show eqs) $
     debug ("mateqs: " ++ show mateqs) $
-    solve_system_gmres mat rhs
+    debug ("ltree: " ++ toSexp lt) $ do
+    prd mat
+    prd rhs
+    sol <- solve_system_gmres mat rhs
+    prd sol
+    return sol
 
 -- infer_gmres :: Tree Bool -> Maybe Rational
 -- infer_gmres t =
 --   toRational <$>
 --   (lookupSV 0 $ unsafePerformIO $ solve_matrix $ tree_constraint_matrix t)
+
+-- [(0,[(0,1.0),(1,-0.5),(4,-0.5)]),
+--  (1,[(0,-0.5),(1,1.0),(3,-0.5)]),
+--  (2,[(1,-0.5),(3,1.0)]),
+--  (3,[(0,-0.5),(2,-0.5),(4,1.0)]),
+--  (4,[(2,1.0),(5,-0.5)]),
+--  (5,[(0,-0.5),(2,-0.5),(5,1.0)])]
