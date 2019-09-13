@@ -52,9 +52,9 @@ main = do
       putStrLn $ toSexp $ reorder t
       putStrLn $ "size: " ++ (show $ tree_size t)
 
-      -- putStrLn "TREE SAMPLING INFERENCE:"
-      -- finite_pmf <- sample_infer t n
-      -- putStrLn $ show finite_pmf
+      putStrLn "TREE SAMPLING INFERENCE:"
+      finite_pmf <- sample_infer t n
+      putStrLn $ show finite_pmf
 
       -- let t' = canon t
       -- putStrLn "REDUCED TREE:"

@@ -61,11 +61,11 @@ call pos = do
 
 cond :: SourcePos -> Parser (Exp SourcePos)
 cond pos = do
-  symbol "if"
+  keyword "if"
   b <- expr
-  symbol "then"
+  keyword "then"
   e1 <- expr
-  symbol "else"
+  keyword "else"
   e2 <- expr
   return $ ECond pos b e1 e2
 
@@ -149,8 +149,8 @@ term = do
     , fst_proj pos
     , snd_proj pos
     , try $ pair pos
-    , try $ call pos
     , try $ cond pos
+    , try $ call pos
     , lam pos
     , ELit pos <$> literal
     , EVar pos <$> ident
